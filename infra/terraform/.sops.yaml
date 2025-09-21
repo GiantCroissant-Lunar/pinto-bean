@@ -1,0 +1,10 @@
+# SOPS configuration for encrypting Terraform Cloud / GitHub variables
+# Replace the placeholder age recipient below with your real public key from `age-keygen`.
+# Example to generate: age-keygen -o infra/terraform/secrets/age.key (keep that file gitignored!)
+# Extract public part: (Get-Content infra/terraform/secrets/age.key | Select-String 'public key:').ToString()
+creation_rules:
+  - path_regex: (infra/terraform/(github/secrets|secrets)/(terraform-github-vars\.json|github-vars\.json\.encrypted|terraform\.json|.*\.(sops\.json|encrypted)))$
+    age: ["age1ulzt4q37zn79mceuec24vhqs89eg3j8wphxa3zdglkwzsph4eurqzs3g87"]
+    encrypted_regex: '^(GITHUB_TOKEN|.*_SECRET|.*_TOKEN|.*_KEY|.*_PASS|.*_PASSWORD|token)$'
+    # Encrypt only sensitive-looking keys; others stay plaintext (optional). Remove encrypted_regex to encrypt everything.
+    # Set to true to always add mac; SOPS defaults suffice otherwise.

@@ -59,6 +59,9 @@ def scan_git_index():
         if not p.is_file():
             continue
         if p.name.endswith(ALLOWED_JSON_SUFFIX):
+            # Skip known config where age public key appears
+            if rel.endswith(".sops.yaml"):
+                continue
             continue
         # Skip entropy scanning in test modules entirely
         if rel.startswith("scripts/python/tests/"):
@@ -81,6 +84,12 @@ def scan_git_index():
                     continue
                 # Skip explicit validator related env var examples
                 if match.startswith("VALIDATOR_"):
+                    continue
+                # age public key recipient (harmless and expected)
+                if match.startswith("age1"):
+                    continue
+                # Skip script/tool names that look entropy-ish
+                if match.startswith("BulkApply") or match.startswith("ApplySecrets") or match.startswith("GetTfc") or match.startswith("QueueTfc") or match.startswith("SetTfc"):
                     continue
                 violations.append(f"Potential secret (high entropy) in {rel}: '{match[:8]}...' entropy={ent:.2f}")
 
