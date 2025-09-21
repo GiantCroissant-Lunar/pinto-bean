@@ -1,40 +1,11 @@
 #!/usr/bin/env pwsh
-# PowerShell pre-commit wrapper (no Bash required)
-# Runs the unified secrets validator (which internally runs detect-secrets + gitleaks)
-
-$ErrorActionPreference = 'Stop'
-
+# Lightweight shim to call actual PowerShell hook logic in pre-commit.ps1
 try {
-  $repoRoot = (git rev-parse --show-toplevel).Trim()
+  $script = Join-Path $PSScriptRoot 'pre-commit.ps1'
+  if (-not (Test-Path $script)) { Write-Error "Missing pre-commit.ps1"; exit 1 }
+  pwsh -NoLogo -NoProfile -File $script
+  exit $LASTEXITCODE
 } catch {
-  Write-Error "Unable to determine repository root: $($_.Exception.Message)"
+  Write-Error $_.Exception.Message
   exit 1
 }
-
-$validator = Join-Path $repoRoot 'scripts' 'python' 'validate_secrets.py'
-if (-not (Test-Path $validator)) {
-  Write-Error "Validator script missing at $validator"
-  exit 1
-}
-
-# Resolve python executable (prefer 'python', fallback 'python3')
-$pythonCmd = $null
-foreach ($cand in @('python','python3')) {
-  $cmd = Get-Command $cand -ErrorAction SilentlyContinue
-  if ($cmd) { $pythonCmd = $cmd.Source; break }
-}
-if (-not $pythonCmd) {
-  Write-Error "Python interpreter not found in PATH (looked for python / python3)."
-  exit 1
-}
-
-Write-Host "[pre-commit] Running secrets validator via: $pythonCmd"
-& $pythonCmd $validator
-$rc = $LASTEXITCODE
-if ($rc -ne 0) {
-  Write-Error "[pre-commit] Secrets validation failed (exit $rc)."
-  exit $rc
-}
-
-Write-Host "[pre-commit] Secrets validation passed."
-exit 0
