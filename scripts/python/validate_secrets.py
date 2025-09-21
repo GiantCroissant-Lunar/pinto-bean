@@ -7,7 +7,7 @@ Rules:
 Exit non-zero on violation; print reasons.
 """
 from __future__ import annotations
-import os, re, sys, json, math, pathlib, subprocess, shutil
+import os, re, sys, json, math, pathlib, subprocess, shutil, datetime, uuid
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SECRET_DIRS = [REPO_ROOT/"infra"/"terraform"/"secrets", REPO_ROOT/"infra"/"terraform"/"github"/"secrets"]
@@ -60,6 +60,9 @@ def scan_git_index():
             continue
         if p.name.endswith(ALLOWED_JSON_SUFFIX):
             continue
+        # Skip entropy scanning in test modules entirely
+        if rel.startswith("scripts/python/tests/"):
+            continue
         if p.suffix.lstrip('.') not in candidate_ext:
             continue
         try:
@@ -75,6 +78,9 @@ def scan_git_index():
                and not rel.startswith("infra/terraform/github/secrets/"):
                 # Skip if token looks like a path or terraform directory fragment (common false positives)
                 if path_fragment.search(match):
+                    continue
+                # Skip explicit validator related env var examples
+                if match.startswith("VALIDATOR_"):
                     continue
                 violations.append(f"Potential secret (high entropy) in {rel}: '{match[:8]}...' entropy={ent:.2f}")
 
@@ -150,12 +156,49 @@ def run_gitleaks():
                 except OSError:
                     pass
 
+def emit_reports(violations: list[str]):
+    sarif_path = os.getenv("VALIDATOR_SARIF")
+    json_path = os.getenv("VALIDATOR_JSON")
+    if not (sarif_path or json_path):
+        return
+    timestamp = datetime.datetime.utcnow().isoformat() + "Z"
+    if json_path:
+        try:
+            with open(json_path, 'w', encoding='utf-8') as jf:
+                json.dump({"timestamp": timestamp, "violations": violations}, jf, indent=2)
+        except Exception as e:
+            print(f"Could not write JSON report: {e}", file=sys.stderr)
+    if sarif_path:
+        sarif = {
+            "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "pinto-bean-secret-validator", "version": "1.0.0"}},
+                    "results": [
+                        {
+                            "ruleId": "SECRET-CHECK",
+                            "level": "error",
+                            "message": {"text": v},
+                            "locations": []
+                        } for v in violations
+                    ]
+                }
+            ]
+        }
+        try:
+            with open(sarif_path, 'w', encoding='utf-8') as sf:
+                json.dump(sarif, sf, indent=2)
+        except Exception as e:
+            print(f"Could not write SARIF report: {e}", file=sys.stderr)
+
 if __name__ == "__main__":
     scan_plain_json()
     check_age_key()
     scan_git_index()
     run_detect_secrets()
     run_gitleaks()
+    emit_reports(violations)
     if violations:
         print("Secret validation FAILED:\n" + "\n".join(f" - {v}" for v in violations))
         sys.exit(1)

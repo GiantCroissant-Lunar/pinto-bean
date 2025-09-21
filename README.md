@@ -45,6 +45,14 @@ Pre-commit and CI use a unified Python validator (`scripts/python/validate_secre
 2. detect-secrets baseline diff (`.secrets.baseline`).
 3. gitleaks scan with `.gitleaks.toml` allowlist (parsed into same report).
 
+Optional report outputs (CI friendly):
+Set these env vars before running the validator to emit artifacts:
+```
+VALIDATOR_JSON=secret-scan.json
+VALIDATOR_SARIF=secret-scan.sarif
+```
+SARIF can be uploaded to code scanning dashboards (GitHub Advanced Security, etc.).
+
 Enable hooks locally (cross‑platform launcher auto-selects pwsh/python):
 ```
 git config core.hooksPath .githooks
