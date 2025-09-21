@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  security-events: write  # needed to upload SARIF
 
 jobs:
   terraform:
@@ -87,9 +88,30 @@ jobs:
           echo "TFC_TOKEN retrieved from terraform.json"
           echo "TFC_TOKEN=$token" >> "$GITHUB_ENV"
 
-      - name: Validate secret hygiene
+      - name: Validate secret hygiene & export reports
         run: |
+          export VALIDATOR_JSON=secret-scan.json
+          export VALIDATOR_SARIF=secret-scan.sarif
           python scripts/python/validate_secrets.py
+          ls -l secret-scan.* || true
+
+      - name: Upload secret scan SARIF
+        if: always()
+        run: |
+          if [ -f secret-scan.sarif ]; then
+            echo "Uploading SARIF";
+            gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              repos/${{ github.repository }}/code-scanning/sarifs \
+              -F commit_sha=${{ github.sha }} \
+              -F ref=${{ github.ref }} \
+              -F sarif=@secret-scan.sarif || echo "SARIF upload failed";
+          else
+            echo "No SARIF file to upload";
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
       - name: Export variables to TFC
@@ -99,6 +121,10 @@ jobs:
       - name: Terraform Init
         working-directory: infra/terraform/github
         run: terraform init -input=false
+
+      - name: Terraform Format Check
+        working-directory: infra/terraform/github
+        run: terraform fmt -check -diff || (echo "Terraform fmt failed" >&2; exit 1)
 
       - name: Terraform Validate
         working-directory: infra/terraform/github
