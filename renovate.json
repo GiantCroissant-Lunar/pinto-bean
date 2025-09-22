@@ -37,6 +37,14 @@
       "groupName": "nuget non-major",
       "automerge": false,
       "labels": ["deps", "dotnet"]
+    },
+    {
+      "description": "Default non-major automerge for safe ecosystems",
+      "matchUpdateTypes": ["minor", "patch"],
+      "excludePackagePatterns": ["^ruff$", "^mypy$", "^pytest$"],
+      "excludeManagers": ["terraform", "nuget"],
+      "automerge": true,
+      "automergeType": "pr"
     }
   ],
   "enabledManagers": ["github-actions", "pip_requirements", "terraform", "nuget"],

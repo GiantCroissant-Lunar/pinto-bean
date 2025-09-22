@@ -4,6 +4,7 @@
 [![CodeQL](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml)
 [![Trivy Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml)
 [![Weekly Secret Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml)
+[![Renovate Dashboard](https://img.shields.io/badge/renovate-dashboard-brightgreen?logo=renovatebot)](../../issues/1)
 
 Infrastructure automation for GitHub repository management via Terraform Cloud.
 
