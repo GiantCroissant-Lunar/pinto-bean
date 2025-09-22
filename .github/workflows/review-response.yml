@@ -1,0 +1,125 @@
+---
+name: AI Review Response
+
+on:
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  respond-to-review:
+    name: Respond to Review Comments
+    runs-on: ubuntu-latest
+    if: |
+      github.event.review.user.login == 'github-copilot' ||
+      github.event.comment.user.login == 'github-copilot' ||
+      contains(github.event.comment.body, '@ai') ||
+      contains(github.event.review.body, '@ai')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get PR details
+        id: pr_details
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "comment_id=${{ github.event.comment.id }}" >> $GITHUB_OUTPUT
+            echo "comment_body=$(echo '${{ github.event.comment.body }}' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+            echo "thread_id=${{ github.event.comment.pull_request_review_id }}" >> $GITHUB_OUTPUT
+          else
+            echo "pr_number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "comment_id=${{ github.event.comment.id }}" >> $GITHUB_OUTPUT
+            echo "comment_body=$(echo '${{ github.event.comment.body }}' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract file and line info
+        id: file_info
+        if: github.event_name == 'pull_request_review_comment'
+        run: |
+          echo "file_path=${{ github.event.comment.path }}" >> $GITHUB_OUTPUT
+          echo "line_number=${{ github.event.comment.line }}" >> $GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          if [ -f scripts/python/requirements-dev.txt ]; then
+            pip install -r scripts/python/requirements-dev.txt
+          fi
+
+      - name: Process review comment with AI
+        id: ai_response
+        run: |
+          cd scripts/python
+          python -m ai_review.cli process-comment \
+            ${{ steps.pr_details.outputs.pr_number }} \
+            ${{ steps.pr_details.outputs.comment_id }} \
+            "${{ steps.pr_details.outputs.comment_body }}" \
+            ${{ steps.file_info.outputs.file_path && format('--file {0}', steps.file_info.outputs.file_path) || '' }} \
+            ${{ steps.file_info.outputs.line_number && format('--line {0}', steps.file_info.outputs.line_number) || '' }} \
+            --repo-root ../..
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action AI"
+
+          git add .
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git push
+          fi
+
+      - name: Get review thread ID for resolution
+        id: get_thread
+        if: github.event_name == 'pull_request_review_comment'
+        run: |
+          REPO="${{ github.repository }}"
+          PR_NUMBER="${{ steps.pr_details.outputs.pr_number }}"
+          COMMENT_ID="${{ steps.pr_details.outputs.comment_id }}"
+
+          # Get the review thread ID that contains this comment
+          THREAD_ID=$(gh api graphql -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" -f query='
+            query($owner:String!, $name:String!, $number:Int!) {
+              repository(owner:$owner, name:$name) {
+                pullRequest(number:$number) {
+                  reviewThreads(first:100) {
+                    nodes {
+                      id
+                      isResolved
+                      comments(first:20) {
+                        nodes {
+                          id
+                          databaseId
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }' | jq -r --arg comment_id "$COMMENT_ID" '
+            .data.repository.pullRequest.reviewThreads.nodes[] |
+            select(.comments.nodes[] | .databaseId == ($comment_id | tonumber)) |
+            .id')
+
+          echo "thread_id=$THREAD_ID" >> $GITHUB_OUTPUT
+          echo "Found thread ID: $THREAD_ID"
+
+      - name: Note completion
+        run: |
+          echo "AI review response processing completed"
+          echo "Check the PR for automated comments and resolved conversations"

@@ -1,0 +1,16 @@
+{
+  "terraform": [
+    { "key": "github_owner", "value": "GiantCroissant-Lunar" },
+    { "key": "repository_name", "value": "pinto-bean" },
+    { "key": "default_branch", "value": "main" },
+    { "key": "required_status_checks", "value": "[\"build\",\"test\"]", "hcl": true },
+    { "key": "required_approving_review_count", "value": "1" },
+    { "key": "enforce_admins", "value": "true", "hcl": true },
+    { "key": "allow_force_pushes", "value": "false", "hcl": true },
+    { "key": "allow_deletions", "value": "false", "hcl": true },
+    { "key": "lock_branch", "value": "false", "hcl": true }
+  ],
+  "env": [
+    { "key": "GITHUB_TOKEN", "value": "<replace>" }
+  ]
+}

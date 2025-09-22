@@ -1,0 +1,63 @@
+---
+name: Trivy Scan
+
+'on':
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '11 4 * * 1'  # Weekly Monday 04:11 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  trivy-scan:
+    name: Trivy Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ runner.os }}
+          restore-keys: |
+            trivy-db-
+
+      - name: Install Trivy
+        run: |
+          VERSION=$(curl -sSL https://api.github.com/repos/aquasecurity/trivy/releases/latest | grep tag_name | cut -d '"' -f4)
+          curl -sSL https://github.com/aquasecurity/trivy/releases/download/${VERSION}/trivy_${VERSION#v}_Linux-64bit.tar.gz \
+            -o trivy.tgz
+          tar -xzf trivy.tgz trivy
+          sudo mv trivy /usr/local/bin/
+
+      - name: Trivy FS scan (SARIF)
+        run: |
+          trivy fs --exit-code 0 --format sarif --output trivy-fs.sarif . || true
+          # produce summary table for high severity
+          trivy fs --exit-code 0 --severity HIGH,CRITICAL --format table . || true
+
+      - name: Trivy Config scan (SARIF)
+        run: |
+          trivy config --exit-code 0 --format sarif --output trivy-config.sarif infra || true
+          trivy config --exit-code 0 --severity HIGH,CRITICAL --format table infra || true
+
+      - name: Upload Trivy FS SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: 'trivy-fs'
+
+      - name: Upload Trivy Config SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-config.sarif
+          category: 'trivy-config'

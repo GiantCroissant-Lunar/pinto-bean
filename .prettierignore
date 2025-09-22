@@ -1,0 +1,14 @@
+# Ignore Unity YAML assets
+*.meta
+*.unity
+*.prefab
+*.asset
+*.anim
+*.controller
+*.shader
+*.shadergraph
+# Folders Unity touches
+Library/
+Temp/
+Obj/
+Build/

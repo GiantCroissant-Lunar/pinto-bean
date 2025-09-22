@@ -1,0 +1,52 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "pip"
+    directory: "/scripts/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:10"
+      timezone: "Etc/UTC"
+    allow:
+      - dependency-type: "direct"
+    ignore:
+      - dependency-name: "mypy"
+        update-types: ["version-update:semver-major"]
+    groups:
+      python-dev:
+        patterns: ["*"]
+
+  - package-ecosystem: "terraform"
+    directory: "/infra/terraform"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:20"
+      timezone: "Etc/UTC"
+    groups:
+      terraform-core:
+        patterns: ["hashicorp/*"]
+
+  - package-ecosystem: "nuget"
+    directory: "/projects/unity-complete"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:30"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    groups:
+      nuget-minor:
+        update-types: ["minor", "patch"]

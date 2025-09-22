@@ -1,0 +1,15 @@
+title = "pinto-bean gitleaks config"
+
+[allowlist]
+# Paths and file patterns to ignore
+paths = [
+  "infra/terraform/secrets/terraform.json.encrypted",
+  "infra/terraform/secrets/terraform.json.sops.json",
+  "infra/terraform/secrets/terraform.json.encrypted.json",
+  "infra/terraform/github/secrets/github-vars.json.encrypted",
+  "infra/terraform/github/secrets/github-vars.encrypted.json",
+  "infra/terraform/github/secrets/github-vars.encrypted",
+  "infra/terraform/secrets/age.key"
+]
+
+# You can also define regexes of commits or paths if needed later.

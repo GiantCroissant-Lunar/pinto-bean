@@ -1,0 +1,69 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["Library", "Temp", "Obj", "Build", ".venv", ".git"]
+cache-dir = "scripts/python/.ruff_cache"
+
+[tool.ruff.lint]
+select = ["E","F","I","W","UP","B","A","C4","YTT","S","RUF"]
+ignore = [
+  "E203",  # slice spacing compatibility
+  "E501",  # let formatter manage line length
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/python/tests/*" = ["S101"]  # Allow assert usage in tests
+"scripts/python/tools/hooks/*" = ["S"]  # Relax security rules for simple local hook scripts
+"scripts/python/tools/baseline_audit.py" = ["S607"]  # Allow git subprocess heuristic
+
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Temporarily disable unreachable warnings due to false positives in simple hook script on Windows
+warn_unreachable = false
+strict_optional = true
+no_implicit_optional = true
+disallow_untyped_defs = true
+exclude = '(Library|Temp|Obj|Build|.venv|.git)'
+cache_dir = "scripts/python/.mypy_cache"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --color=yes --strict-markers --cov=scripts/python --cov-report=term-missing --cov-report=xml:scripts/python/coverage.xml"
+testpaths = [
+  "scripts/python/tests"
+]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+cache_dir = "scripts/python/.pytest_cache"
+
+[tool.coverage.run]
+branch = true
+source = ["scripts/python"]
+data_file = "scripts/python/.coverage"
+omit = [
+  "scripts/python/tests/*",
+  "scripts/python/tools/hooks/*",
+  "scripts/python/validate_secrets.py"
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == '__main__':"
+]
+fail_under = 70

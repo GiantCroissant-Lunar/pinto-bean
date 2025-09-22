@@ -1,0 +1,18 @@
+# CODEOWNERS governs default reviewers and required approvals when code owner reviews enabled.
+# Lines are pattern followed by one or more owners (GitHub usernames or teams).
+# Adjust teams after creation (e.g. @GiantCroissant-Lunar/platform @GiantCroissant-Lunar/infra )
+
+# Default owners for everything
+* @GiantCroissant-Lunar/maintainers
+
+# Terraform infrastructure
+infra/terraform/ @GiantCroissant-Lunar/infra
+
+# GitHub workflows
+.github/workflows/ @GiantCroissant-Lunar/infra
+
+# Python tooling
+scripts/python/ @GiantCroissant-Lunar/devtools
+
+# Unity project
+projects/unity-complete/ @GiantCroissant-Lunar/game

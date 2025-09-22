@@ -1,0 +1,54 @@
+###############################################################################
+# Root-level Git attributes for consistent text normalization & LFS policies  #
+###############################################################################
+
+# Ensure all text files normalize line endings on commit (checkout respects eol rules below)
+* text=auto eol=lf
+
+# Explicit LF enforcement for key text formats
+*.{yml,yaml}         text eol=lf
+*.tf                 text eol=lf
+*.tfvars             text eol=lf
+*.json               text eol=lf
+*.jsonc              text eol=lf
+*.md                 text eol=lf
+*.py                 text eol=lf
+*.sh                 text eol=lf
+*.ps1                text eol=lf
+*.psm1               text eol=lf
+*.psd1               text eol=lf
+*.cs                 text eol=lf
+*.ts                 text eol=lf
+*.js                 text eol=lf
+*.tsv                text eol=lf
+*.csv                text eol=lf
+
+# Unity-specific assets handled in projects/.gitattributes
+
+# Treat lockfiles deterministically
+package-lock.json    text eol=lf -diff
+pnpm-lock.yaml       text eol=lf -diff
+yarn.lock            text eol=lf -diff
+poetry.lock          text eol=lf -diff
+
+# Mark common binary artifacts (avoid diff noise if committed inadvertently)
+# Note: Large binary files for Unity projects are handled via LFS in projects/.gitattributes
+*.dll binary
+*.exe binary
+*.pdb binary
+*.so  binary
+*.dylib binary
+*.zip binary
+*.7z  binary
+*.rar binary
+
+# Prevent CRLF reintroduction on Windows for these patterns
+*.bat text eol=lf
+
+# Git attributes for diff enhancements (optional examples commented)
+# *.tf diff=terraform
+# *.cs diff=csharp
+
+###############################################################################
+# End of file
+###############################################################################

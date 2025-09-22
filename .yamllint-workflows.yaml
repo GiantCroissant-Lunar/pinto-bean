@@ -1,0 +1,12 @@
+---
+# Relaxed yamllint config for GitHub workflows
+extends: default
+
+rules:
+  line-length:
+    max: 150  # Allow longer lines for URLs and complex expressions
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+    check-keys: false  # Don't check keys like 'on:' in workflows
+  new-lines:
+    type: unix
