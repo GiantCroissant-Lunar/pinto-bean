@@ -41,21 +41,24 @@ def get_repo_name() -> str:
         )
         url = result.stdout.strip()
 
-        # Parse GitHub URL
-        if "github.com" in url:
-            # Handle both SSH and HTTPS URLs
-            if url.startswith("git@"):
-                # git@github.com:owner/repo.git
-                repo_part = url.split(":")[-1]
-            else:
-                # https://github.com/owner/repo.git
+        # Parse GitHub URL with proper validation
+        if url.startswith("git@github.com:") or url.startswith("https://github.com/"):
+            # Handle SSH URLs
+            if url.startswith("git@github.com:"):
+                repo_part = url[len("git@github.com:") :]
+            # Handle HTTPS URLs
+            elif url.startswith("https://github.com/"):
                 repo_part = "/".join(url.split("/")[-2:])
+            else:
+                repo_part = ""
 
             # Remove .git suffix
             if repo_part.endswith(".git"):
                 repo_part = repo_part[:-4]
 
-            return repo_part
+            # Validate repo format (owner/repo)
+            if "/" in repo_part and len(repo_part.split("/")) == 2:
+                return repo_part
     except Exception as e:
         logging.debug(f"Failed to get repo from git remote: {e}")
 

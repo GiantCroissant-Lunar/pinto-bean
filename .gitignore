@@ -5,3 +5,6 @@
 .ruff_cache/
 scripts/python/.mypy_cache/
 scripts/python/.ruff_cache/
+scripts/python/.pytest_cache/
+scripts/python/.coverage
+scripts/python/coverage.xml
