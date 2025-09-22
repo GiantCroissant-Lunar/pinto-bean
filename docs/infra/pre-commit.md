@@ -56,12 +56,11 @@ pre-commit autoupdate
 | Secrets | gitleaks | Signature-based secret scanning | Redact mode; staging focus |
 | Secrets | detect-secrets | Baseline diff scanning | Requires `.secrets.baseline` |
 | Commit Convention | commitizen | Enforce commit message format | `commit-msg` stage |
-| .NET | dotnet-format | Ensure C# formatting | No changes allowed |
 | Unity | unity-meta-check | Ensure `.meta` files exist | Custom local Python hook |
 | Unity | unity-packages-lock-check | Manifest vs lock sync | Custom local Python hook |
 | Unity / Assets | lfs-enforce | Enforce Git LFS for large binaries | Custom local Python hook |
-| Unity | block-library-temp-obj-build | Block generated folders | Shell one-liner |
-| Binary Safety | binary-blocker | Prevent compiled binaries | Shell one-liner |
+| Unity | block-library-temp-obj-build | Block generated folders | Custom local Python hook |
+| Binary Safety | binary-blocker | Prevent compiled binaries | Custom local Python hook |
 | Python | ruff | Lint + autofix (selected categories) | Runs before formatting |
 | Python | ruff-format | Code formatting (PEP 8 + style) | Idempotent |
 | Python | mypy | Static type checking | Targets `scripts/python` |

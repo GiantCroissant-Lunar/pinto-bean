@@ -11,8 +11,7 @@ Infrastructure automation for GitHub repository management via Terraform Cloud.
 
 ## Secrets & Tokens
 
-Terraform Cloud token (TFC_TOKEN) is sourced exclusively from an encrypted `terraform.json.encrypted` (legacy `
-terraform.json.sops.json` and `terraform.json.encrypted.json` still supported) in `infra/terraform/secrets/`.
+Terraform Cloud token (TFC_TOKEN) is sourced exclusively from an encrypted `terraform.json.encrypted` (legacy `terraform.json.sops.json` and `terraform.json.encrypted.json` still supported) in `infra/terraform/secrets/`.
 Example template plaintext (committed scaffold) `infra/terraform/secrets/terraform.json` before encryption (contains only placeholders — safe to keep):
 ```
 {

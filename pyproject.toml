@@ -16,7 +16,6 @@ ignore = [
 "scripts/python/tools/hooks/*" = ["S"]  # Relax security rules for simple local hook scripts
 
 [tool.ruff.lint.isort]
-known-first-party = ["your_package_name_if_any"]
 combine-as-imports = true
 
 [tool.ruff.format]

@@ -39,28 +39,35 @@ $invalid = $requested | Where-Object { $_ -notin $allSteps }
 if ($invalid) { Write-Error "Unknown step(s): $($invalid -join ', ')"; exit 2 }
 
 function Test-CommandAvailable {
-  if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { Write-Error "$name not found in PATH"; exit 3 }
+  param(
+    [Parameter(Mandatory)][string]$Name
+  )
+  if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) { Write-Error "$Name not found in PATH"; exit 3 }
 }
 
 # Pre-flight: only check commands actually needed
-if ($requested -contains 'precommit') { Test-CommandAvailable pre-commit }
-if ($requested -contains 'ruff') { Test-CommandAvailable ruff }
-if ($requested -contains 'mypy') { Test-CommandAvailable mypy }
-if ($requested -contains 'terraform') { Test-CommandAvailable terraform }
-if ($requested -contains 'secrets') { Test-CommandAvailable python }
-if ($requested -contains 'tests') { Test-CommandAvailable python }
+if ($requested -contains 'precommit') { Test-CommandAvailable -Name 'pre-commit' }
+if ($requested -contains 'ruff') { Test-CommandAvailable -Name 'ruff' }
+if ($requested -contains 'mypy') { Test-CommandAvailable -Name 'mypy' }
+if ($requested -contains 'terraform') { Test-CommandAvailable -Name 'terraform' }
+if ($requested -contains 'secrets') { Test-CommandAvailable -Name 'python' }
+if ($requested -contains 'tests') { Test-CommandAvailable -Name 'python' }
 
 $global:failures = @()
 function Invoke-QAStep {
-  if ($requested -contains $name) {
-    Write-Section $name
-    try { & $block } catch { $global:failures += $name; Write-Host "[$name] FAILED: $($_.Exception.Message)" -ForegroundColor Red }
+  param(
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][scriptblock]$Block
+  )
+  if ($requested -contains $Name) {
+    Write-Section $Name
+    try { & $Block } catch { $global:failures += $Name; Write-Host "[$Name] FAILED: $($_.Exception.Message)" -ForegroundColor Red }
   }
 }
 
-Invoke-QAStep 'precommit' { pre-commit run --all-files }
+Invoke-QAStep -Name 'precommit' -Block { pre-commit run --all-files }
 
-Invoke-QAStep 'ruff' {
+Invoke-QAStep -Name 'ruff' -Block {
   if ($Fix) {
     ruff check --fix .
     ruff format .
@@ -73,15 +80,15 @@ Invoke-QAStep 'ruff' {
   }
 }
 
-Invoke-QAStep 'mypy' { mypy scripts/python }
+Invoke-QAStep -Name 'mypy' -Block { mypy scripts/python }
 
-Invoke-QAStep 'secrets' {
+Invoke-QAStep -Name 'secrets' -Block {
   if ($LegacyFullScan) { $env:LEGACY_FULL_SCAN = '1' }
   $env:VALIDATOR_JSON = 'secret-scan.local.json'
   python scripts/python/validate_secrets.py
 }
 
-Invoke-QAStep 'terraform' {
+Invoke-QAStep -Name 'terraform' -Block {
   Push-Location infra/terraform/github
   try {
     if ($Fix) { terraform fmt -recursive } else { terraform fmt -check -diff }
@@ -89,14 +96,14 @@ Invoke-QAStep 'terraform' {
   } finally { Pop-Location }
 }
 
-Invoke-QAStep 'format' {
+Invoke-QAStep -Name 'format' -Block {
   if (-not $Fix) { Write-Host 'Format step requires -Fix to apply changes' -ForegroundColor Yellow; return }
   ruff format .
   Push-Location infra/terraform/github
   try { terraform fmt -recursive } finally { Pop-Location }
 }
 
-Invoke-QAStep 'tests' {
+Invoke-QAStep -Name 'tests' -Block {
   # Run pytest with coverage (xml + terminal summary); requires pytest + pytest-cov installed.
   if (-not (Get-Command pytest -ErrorAction SilentlyContinue)) { Write-Error 'pytest not installed (pip install pytest pytest-cov)'; return }
   pytest --cov=scripts/python --cov-report=term-missing --cov-report=xml:coverage.xml
