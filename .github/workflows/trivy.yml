@@ -15,10 +15,10 @@ permissions:
   security-events: write
 
 jobs:
-  fs-scan:
-    name: Trivy FS / Config Scan
+  trivy-scan:
+    name: Trivy Security Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,31 +45,15 @@ jobs:
           # produce summary table for high severity
           trivy fs --exit-code 0 --severity HIGH,CRITICAL --format table . || true
 
-      - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-fs.sarif
-
-  config-scan:
-    name: Trivy Config (IaC) Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Trivy (config)
-        run: |
-          VERSION=$(curl -sSL https://api.github.com/repos/aquasecurity/trivy/releases/latest | grep tag_name | cut -d '"' -f4)
-          curl -sSL https://github.com/aquasecurity/trivy/releases/download/${VERSION}/trivy_${VERSION#v}_Linux-64bit.tar.gz \
-            -o trivy.tgz
-          tar -xzf trivy.tgz trivy
-          sudo mv trivy /usr/local/bin/
-
       - name: Trivy Config scan (SARIF)
         run: |
           trivy config --exit-code 0 --format sarif --output trivy-config.sarif infra || true
           trivy config --exit-code 0 --severity HIGH,CRITICAL --format table infra || true
+
+      - name: Upload Trivy FS SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
 
       - name: Upload Trivy Config SARIF
         uses: github/codeql-action/upload-sarif@v3

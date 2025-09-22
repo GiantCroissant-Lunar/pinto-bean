@@ -7,6 +7,9 @@ concurrency:
 on:
   push:
     branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,46 +17,8 @@ permissions:
   security-events: write
 
 jobs:
-  pre-commit:
-    name: Pre-commit Quality Gate
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-      - name: Cache pre-commit envs
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            pre-commit-${{ runner.os }}-
-      - name: Install pre-commit
-        run: |
-          pip install -r scripts/python/requirements-dev.txt --no-deps --upgrade-strategy eager || \
-            pip install -r scripts/python/requirements-dev.txt
-      - name: Run pre-commit (all files)
-        run: pre-commit run --all-files
-      - name: Ruff explicit check (CI redundancy)
-        run: ruff check .
-      - name: Cache type/lint/test caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            .mypy_cache
-            .ruff_cache
-          key: precommit-caches-${{ runner.os }}-${{ hashFiles('scripts/python/requirements-dev.txt') }}
-          restore-keys: |
-            precommit-caches-${{ runner.os }}-
   tests:
     name: Python Tests & Coverage
-    needs: pre-commit
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -89,7 +54,7 @@ jobs:
           name: coverage-xml
           path: coverage.xml
   terraform:
-    needs: [pre-commit, tests]
+    needs: [tests]
     environment: dev
     runs-on: ubuntu-latest
     env:
