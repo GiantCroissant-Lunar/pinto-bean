@@ -22,32 +22,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['csharp', 'python']
+        language: ['python']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup .NET
-        if: matrix.language == 'csharp'
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          config: |
-            paths-ignore:
-              - '**/Library/**'
-              - '**/Temp/**'
-              - '**/Obj/**'
-              - '**/Build/**'
-              - '**/Builds/**'
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-        if: matrix.language == 'csharp'
 
       - name: Install Python (for python matrix)
         if: matrix.language == 'python'

@@ -44,10 +44,10 @@ class GitHubClient:
         """Run gh CLI command and return output."""
         try:
             result = subprocess.run(  # noqa: S603
-                ["gh", *command],
+                ["gh", *command],  # noqa: S607
                 capture_output=True,
                 text=True,
-                check=True,  # noqa: S607
+                check=True,
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:

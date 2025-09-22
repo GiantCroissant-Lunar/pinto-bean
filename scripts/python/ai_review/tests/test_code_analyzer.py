@@ -11,7 +11,7 @@ class TestCodeAnalyzer:
         """Setup test instance."""
         self.analyzer = CodeAnalyzer(".")
 
-    def test_feedback_analysis_bug_fix(self) -> None:
+    def test_bug_fix_detection(self) -> None:
         """Test bug fix detection."""
         comment = "This code has a bug that causes crashes"
         result = self.analyzer.analyze_feedback(comment)
