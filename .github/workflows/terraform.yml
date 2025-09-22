@@ -1,17 +1,95 @@
+---
+# yamllint disable rule:truthy
 name: Terraform Plan & Apply
-
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
   id-token: write
-  security-events: write  # needed to upload SARIF
+  security-events: write
 
 jobs:
+  pre-commit:
+    name: Pre-commit Quality Gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Cache pre-commit envs
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ runner.os }}-
+      - name: Install pre-commit
+        run: |
+          pip install -r scripts/python/requirements-dev.txt --no-deps --upgrade-strategy eager || \
+            pip install -r scripts/python/requirements-dev.txt
+      - name: Run pre-commit (all files)
+        run: pre-commit run --all-files
+      - name: Ruff explicit check (CI redundancy)
+        run: ruff check .
+      - name: Cache type/lint/test caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            .mypy_cache
+            .ruff_cache
+          key: precommit-caches-${{ runner.os }}-${{ hashFiles('scripts/python/requirements-dev.txt') }}
+          restore-keys: |
+            precommit-caches-${{ runner.os }}-
+  tests:
+    name: Python Tests & Coverage
+    needs: pre-commit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install test dependencies
+        run: |
+          pip install -r scripts/python/requirements-dev.txt --no-deps --upgrade-strategy eager || \
+            pip install -r scripts/python/requirements-dev.txt
+      - name: Cache test/type/lint caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            .pytest_cache
+            .mypy_cache
+            .ruff_cache
+          key: tests-caches-${{ runner.os }}-${{ hashFiles('scripts/python/requirements-dev.txt') }}
+          restore-keys: |
+            tests-caches-${{ runner.os }}-
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=scripts/python --cov-report=term-missing --cov-report=xml:coverage.xml
+      - name: Upload coverage artifact
+        if: always() && hashFiles('coverage.xml') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
   terraform:
+    needs: [pre-commit, tests]
     environment: dev
     runs-on: ubuntu-latest
     env:
@@ -20,58 +98,37 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.8.5
-
       - name: Install SOPS
         run: |
           sudo apt-get update -y
           sudo apt-get install -y sops
-
-      - name: Install gitleaks
-        run: |
-          curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
-            | grep browser_download_url \
-            | grep linux_x64.tar.gz \
-            | cut -d '"' -f 4 \
-            | xargs curl -L -o gitleaks.tar.gz
-          tar -xzf gitleaks.tar.gz gitleaks
-          sudo mv gitleaks /usr/local/bin/
-          gitleaks version
-
-      - name: Install detect-secrets
-        run: |
-          pip install --upgrade pip
-          pip install detect-secrets
-
+      # Secret scanning handled elsewhere
       - name: Write age key
         run: |
           echo "$SOPS_AGE_KEY" > infra/terraform/secrets/age.key
           chmod 600 infra/terraform/secrets/age.key
-
       - name: Decrypt secrets (github vars)
         run: |
           if [ -f infra/terraform/github/secrets/github-vars.json.encrypted ]; then
-            sops -d infra/terraform/github/secrets/github-vars.json.encrypted > infra/terraform/github/secrets/github-vars.decrypted.json
+            sops -d infra/terraform/github/secrets/github-vars.json.encrypted > \
+              infra/terraform/github/secrets/github-vars.decrypted.json
           elif [ -f infra/terraform/secrets/github-vars.json.encrypted ]; then
-            sops -d infra/terraform/secrets/github-vars.json.encrypted > infra/terraform/secrets/github-vars.decrypted.json
+            sops -d infra/terraform/secrets/github-vars.json.encrypted > \
+              infra/terraform/secrets/github-vars.decrypted.json
           fi
-
       - name: Decrypt terraform.json if present
         run: |
           if [ -f infra/terraform/secrets/terraform.json.encrypted ]; then
             sops -d infra/terraform/secrets/terraform.json.encrypted > infra/terraform/secrets/terraform.json
           elif [ -f infra/terraform/secrets/terraform.json.sops.json ]; then
-            # Backward compatibility
             sops -d infra/terraform/secrets/terraform.json.sops.json > infra/terraform/secrets/terraform.json
           elif [ -f infra/terraform/secrets/terraform.json.encrypted.json ]; then
-            # Older intermediate naming
             sops -d infra/terraform/secrets/terraform.json.encrypted.json > infra/terraform/secrets/terraform.json
           fi
-
       - name: Load TFC token from decrypted terraform.json
         shell: bash
         run: |
@@ -81,59 +138,29 @@ jobs:
           if command -v jq >/dev/null 2>&1; then
             token=$(jq -r '.TFC_TOKEN // empty' infra/terraform/secrets/terraform.json)
           else
-            token=$(python -c "import json;import sys;d=json.load(open('infra/terraform/secrets/terraform.json'));print(d.get('TFC_TOKEN',''))")
+            token=$(python -c "import json;
+              d=json.load(open('infra/terraform/secrets/terraform.json'));
+              print(d.get('TFC_TOKEN',''))")
           fi
           if [ -z "$token" ] || [ "$token" = "null" ]; then
             echo "TFC_TOKEN missing in decrypted terraform.json" >&2; exit 1; fi
           echo "TFC_TOKEN retrieved from terraform.json"
           echo "TFC_TOKEN=$token" >> "$GITHUB_ENV"
-
-      - name: Validate secret hygiene & export reports
-        run: |
-          export VALIDATOR_JSON=secret-scan.json
-          export VALIDATOR_SARIF=secret-scan.sarif
-          python scripts/python/validate_secrets.py
-          ls -l secret-scan.* || true
-
-      - name: Upload secret scan SARIF
-        if: always()
-        run: |
-          if [ -f secret-scan.sarif ]; then
-            echo "Uploading SARIF";
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              repos/${{ github.repository }}/code-scanning/sarifs \
-              -F commit_sha=${{ github.sha }} \
-              -F ref=${{ github.ref }} \
-              -F sarif=@secret-scan.sarif || echo "SARIF upload failed";
-          else
-            echo "No SARIF file to upload";
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
       - name: Export variables to TFC
         run: |
           pwsh infra/terraform/scripts/Apply-SecretsJson.ps1 -Organization giantcroissant-lunar -Workspace pinto-bean
-
       - name: Terraform Init
         working-directory: infra/terraform/github
         run: terraform init -input=false
-
       - name: Terraform Format Check
         working-directory: infra/terraform/github
         run: terraform fmt -check -diff || (echo "Terraform fmt failed" >&2; exit 1)
-
       - name: Terraform Validate
         working-directory: infra/terraform/github
         run: terraform validate
-
       - name: Terraform Plan
         working-directory: infra/terraform/github
         run: terraform plan -input=false -no-color
-
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         working-directory: infra/terraform/github

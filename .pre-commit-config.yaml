@@ -21,8 +21,14 @@ repos:
     rev: v1.35.1
     hooks:
       - id: yamllint
+        name: yamllint (general)
         files: \.(yml|yaml)$
+        exclude: ^\.github/workflows/
         args: ["-d", "{extends: default, rules: {line-length: {max: 120}, new-lines: disable}}"]
+      - id: yamllint
+        name: yamllint (workflows)
+        files: ^\.github/workflows/.*\.(yml|yaml)$
+        args: ["-c", ".yamllint-workflows.yaml"]
 
   - repo: https://github.com/zricethezav/gitleaks
     rev: v8.18.4

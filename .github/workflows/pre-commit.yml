@@ -1,0 +1,101 @@
+---
+name: Pre-Commit (PR Gate)
+
+'on':
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - '.pre-commit-config.yaml'
+      - 'scripts/**'
+      - 'tools/**'
+      - '.github/workflows/pre-commit.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write  # allow SARIF upload if secret scan produces one
+
+jobs:
+  pre-commit:
+    name: Run pre-commit hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ runner.os }}-
+
+      - name: Cache mypy & ruff
+        uses: actions/cache@v4
+        with:
+          path: |
+            .mypy_cache
+            .ruff_cache
+          key: typecheck-lint-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml', 'scripts/python/requirements-dev.txt') }}
+          restore-keys: |
+            typecheck-lint-${{ runner.os }}-
+
+      - name: Install dev requirements
+        run: |
+          if [ -f scripts/python/requirements-dev.txt ]; then \
+            pip install -r scripts/python/requirements-dev.txt --no-deps --upgrade-strategy eager || \
+            pip install -r scripts/python/requirements-dev.txt; \
+          fi
+
+      - name: Run pre-commit (changed files fast path)
+        run: pre-commit run --show-diff-on-failure --color=always
+
+      - name: Run pre-commit (all files on main / PR head)
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        run: pre-commit run --all-files --show-diff-on-failure --color=always
+
+      - name: Custom secret validator (SARIF)
+        id: secret_validator
+        run: |
+          set -e
+          export VALIDATOR_SARIF=secret-scan-precommit.sarif
+          if python scripts/python/validate_secrets.py; then
+            echo "validator_exit=0" >> $GITHUB_OUTPUT
+          else
+            rc=$?
+            echo "validator_exit=$rc" >> $GITHUB_OUTPUT
+          fi
+          if [ -f "$VALIDATOR_SARIF" ]; then
+            echo "sarif_present=true" >> $GITHUB_OUTPUT
+            ls -l "$VALIDATOR_SARIF"
+          else
+            echo "sarif_present=false" >> $GITHUB_OUTPUT
+          fi
+          # Propagate failure after outputs captured
+          if [ "$(grep validator_exit= $GITHUB_OUTPUT | cut -d= -f2)" != "0" ]; then exit 1; fi
+
+      - name: Upload secret validator SARIF
+        if: always() && steps.secret_validator.outputs.sarif_present == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: secret-scan-precommit.sarif
+
+      - name: Upload ruff / mypy caches (debug)
+        if: failure() && (hashFiles('.mypy_cache/**') != '' || hashFiles('.ruff_cache/**') != '')
+        uses: actions/upload-artifact@v4
+        with:
+          name: type-lint-caches
+          path: |
+            .mypy_cache
+            .ruff_cache
