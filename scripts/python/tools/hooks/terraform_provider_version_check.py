@@ -9,6 +9,7 @@ Where the nested map lacks a 'version'.
 
 Limitations: naive HCL parsing via regex; sufficient for gating obvious omissions.
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -21,6 +22,7 @@ TERRAFORM_DIR = ROOT / "infra" / "terraform"
 RE_REQUIRED_PROVIDERS_START = re.compile(r"^\s*required_providers\s*{\s*$")
 RE_PROVIDER_ENTRY = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*{(.*)$")
 RE_VERSION = re.compile(r"version\s*=")
+
 
 def scan_file(path: pathlib.Path, problems: list[str]) -> None:
     try:
@@ -49,13 +51,16 @@ def scan_file(path: pathlib.Path, problems: list[str]) -> None:
             current_provider = m.group(1)
             provider_has_version = RE_VERSION.search(line) is not None
             continue
-        if current_provider and RE_VERSION.search(line):
-            provider_has_version = True
-        if current_provider and line.strip().startswith('}'):  # end of provider inline map
-            if not provider_has_version:
-                problems.append(f"{path}: provider '{current_provider}' missing version constraint")
-            current_provider = None
-            provider_has_version = False
+        if current_provider:
+            if RE_VERSION.search(line):
+                provider_has_version = True
+            if line.strip().startswith("}"):
+                if not provider_has_version:
+                    problems.append(
+                        f"{path}: provider '{current_provider}' missing version constraint"
+                    )
+                current_provider = None
+                provider_has_version = False
 
     # End of file: finalize
     if current_provider and not provider_has_version:
@@ -65,7 +70,10 @@ def scan_file(path: pathlib.Path, problems: list[str]) -> None:
 def main(args: list[str]) -> int:
     problems: list[str] = []
     # If filenames passed by pre-commit, filter to .tf; else scan terraform dir
-    tf_files = [pathlib.Path(a) for a in args if a.endswith('.tf')] if args else list(TERRAFORM_DIR.rglob('*.tf'))
+    if args:
+        tf_files = [pathlib.Path(a) for a in args if a.endswith(".tf")]
+    else:
+        tf_files = list(TERRAFORM_DIR.rglob("*.tf"))
     for f in tf_files:
         scan_file(f, problems)
     if problems:
@@ -75,5 +83,7 @@ def main(args: list[str]) -> int:
         return 1
     return 0
 
-if __name__ == "__main__":  # pragma: no cover (simple CLI)
+
+if __name__ == "__main__":  # pragma: no cover - entrypoint
+    # mypy erroneously flags unreachable logic in some Windows newline scenarios; invoke directly.
     sys.exit(main(sys.argv[1:]))

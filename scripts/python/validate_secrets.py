@@ -18,7 +18,6 @@ import re
 import shutil
 import subprocess
 import sys
-import hashlib
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SECRET_DIRS = [
@@ -28,7 +27,9 @@ SECRET_DIRS = [
 ALLOWED_JSON_SUFFIX = ".json.encrypted"
 PLAIN_JSON_BLOCKLIST = re.compile(r".+\.json$")  # not currently used but kept for future refinement
 SENSITIVE_KEY_PATTERN = re.compile(r"(API|SECRET|TOKEN|KEY|PASSWORD|PASS)$", re.IGNORECASE)
-HIGH_ENTROPY_THRESHOLD = 4.0  # bits/char approximate (configurable via ENV: VALIDATOR_ENTROPY_THRESHOLD)
+HIGH_ENTROPY_THRESHOLD = (
+    4.0  # bits/char approximate (configurable via ENV: VALIDATOR_ENTROPY_THRESHOLD)
+)
 MIN_SECRET_LENGTH = 20
 DETECT_BASELINE = REPO_ROOT / ".secrets.baseline"  # retained for optional legacy full scan mode
 
@@ -48,7 +49,11 @@ PATTERN_DEFINITIONS: list[tuple[str, str, re.Pattern[str]]] = [
     ("AWS_ACCESS_KEY", "HIGH", re.compile(r"AKIA[0-9A-Z]{16}")),
     ("GITHUB_PAT", "HIGH", re.compile(r"ghp_[A-Za-z0-9]{36}")),
     ("GITHUB_PAT_NEW", "HIGH", re.compile(r"github_pat_[A-Za-z0-9_]{22,}")),
-    ("JWT_TOKEN", "MEDIUM", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}")),
+    (
+        "JWT_TOKEN",
+        "MEDIUM",
+        re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}"),
+    ),
     ("AGE_PRIVATE_KEY", "CRITICAL", re.compile(r"^AGE-SECRET-KEY-[A-Z0-9]{59}$")),
 ]
 
@@ -101,8 +106,9 @@ def _load_cache() -> None:
     if CACHE_PATH.exists():
         try:
             _cache.update(json.loads(CACHE_PATH.read_text()))
-        except Exception:
-            pass
+        except Exception as e:
+            # benign cache parse issue; continue without cache
+            print(f"[validator] cache load skipped: {e}", file=sys.stderr)
 
 
 def _save_cache() -> None:
@@ -111,11 +117,13 @@ def _save_cache() -> None:
             CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(CACHE_PATH, "w", encoding="utf-8") as fh:
             json.dump(_cache, fh, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[validator] cache save skipped: {e}", file=sys.stderr)
 
 
-def classify(rule_id: str, severity: str, message: str, file: str, token: str | None = None) -> None:
+def classify(
+    rule_id: str, severity: str, message: str, file: str, token: str | None = None
+) -> None:
     findings.append(
         {
             "rule_id": rule_id,
@@ -178,7 +186,9 @@ def scan_git_index() -> None:
                     continue
                 if match.startswith(("BulkApply", "ApplySecrets", "GetTfc", "QueueTfc", "SetTfc")):
                     continue
-                sev = ENTROPY_FAIL_LEVEL if LEVEL_ORDER.get(ENTROPY_FAIL_LEVEL, 3) >= 3 else "MEDIUM"
+                sev = (
+                    ENTROPY_FAIL_LEVEL if LEVEL_ORDER.get(ENTROPY_FAIL_LEVEL, 3) >= 3 else "MEDIUM"
+                )
                 classify(
                     "HIGH_ENTROPY_TOKEN",
                     sev,
@@ -204,11 +214,16 @@ def check_age_key() -> None:
                 content_first = k.read_text().splitlines()[0]
             except Exception:
                 content_first = ""
-                if "SECRET-KEY" in content_first:
+            if "SECRET-KEY" in content_first:
                 # ensure it's ignored by git
                 try:
                     status = sh(
-                        ["git", "ls-files", "--error-unmatch", str(k.relative_to(REPO_ROOT))]
+                        [
+                            "git",
+                            "ls-files",
+                            "--error-unmatch",
+                            str(k.relative_to(REPO_ROOT)),
+                        ]
                     )
                     if status:
                         violations.append(f"age.key appears tracked: {k.relative_to(REPO_ROOT)}")
@@ -331,7 +346,7 @@ def emit_reports(violations: list[str]) -> None:
             print(f"Could not write SARIF report: {e}", file=sys.stderr)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - complex integration logic, exercised via pre-commit
     _load_cache()
     scan_plain_json()
     check_age_key()
@@ -349,13 +364,14 @@ if __name__ == "__main__":
             highest = level
     fail_threshold = LEVEL_ORDER.get(FAIL_LEVEL, 3)
     if highest >= fail_threshold:
-        print("Secret validation FAILED (threshold {}):".format(FAIL_LEVEL))
+        print(f"Secret validation FAILED (threshold {FAIL_LEVEL}):")
         for f in findings:
             if LEVEL_ORDER.get(f["severity"], 0) >= fail_threshold:
                 print(f" - [{f['severity']}] {f['message']}")
         sys.exit(1)
-    if violations:
-        print("Secret validation WARNINGS:")
-        for f in findings:
-            print(f" - [{f['severity']}] {f['message']}")
-    print("Secret validation PASSED")
+    else:
+        if violations:
+            print("Secret validation WARNINGS:")
+            for f in findings:
+                print(f" - [{f['severity']}] {f['message']}")
+        print("Secret validation PASSED")

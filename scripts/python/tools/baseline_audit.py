@@ -5,6 +5,7 @@ Heuristic: list baseline results whose referenced file no longer exists or which
 appeared in git history (approx) within the last N commits (adjust via env BASELINE_HISTORY_COMMITS, default 200).
 This is a lightweight helper; it does not modify the baseline.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,6 +22,7 @@ HISTORY_COMMITS = int(os.getenv("BASELINE_HISTORY_COMMITS", "200"))
 
 def git_grep(path: str, token: str) -> bool:
     try:
+        # Using explicit argument list (no shell) mitigates shell injection; noqa for S607 static rule
         out = subprocess.check_output(  # noqa: S603
             ["git", "log", f"-n{HISTORY_COMMITS}", "-S", token, "--", path],
             cwd=ROOT,
