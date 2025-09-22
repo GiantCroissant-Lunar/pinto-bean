@@ -61,6 +61,7 @@ pre-commit autoupdate
 | Unity / Assets | lfs-enforce | Enforce Git LFS for large binaries | Custom local Python hook |
 | Unity | block-library-temp-obj-build | Block generated folders | Custom local Python hook |
 | Binary Safety | binary-blocker | Prevent compiled binaries | Custom local Python hook |
+| Terraform | terraform-provider-version-check | Enforce provider version pinning | Custom local Python hook |
 | Python | ruff | Lint + autofix (selected categories) | Runs before formatting |
 | Python | ruff-format | Code formatting (PEP 8 + style) | Idempotent |
 | Python | mypy | Static type checking | Targets `scripts/python` |
@@ -71,6 +72,15 @@ pre-commit autoupdate
 2. Gitleaks runs with redact to minimize exposure of candidate secrets.
 3. Custom validator prevents false positives explosion by filtering tokens that look like paths, placeholders, or trivial repetitions.
 4. To run a legacy full scan alone (bypassing framework) via QA script:
+### Secret Hygiene Extensions
+- Classification added (CRITICAL/HIGH/MEDIUM/LOW) with configurable fail threshold via `SECRET_VALIDATOR_FAIL_LEVEL`.
+- Pattern detectors: AWS access keys, GitHub PATs, JWT structure, Age private key format.
+- High-entropy detector configurable via `VALIDATOR_ENTROPY_THRESHOLD`.
+- Placeholders (`<...>`, CHANGEME, example/test/dummy) ignored.
+- JSON & SARIF outputs include structured findings; severity filtering via `VALIDATOR_REPORT_LEVEL`.
+
+### Terraform Provider Version Enforcement
+Custom hook `terraform-provider-version-check` ensures each provider in `required_providers` declares a version constraint. Fails fast on omission to prevent drift.
 
 ```bash
 pwsh scripts/qa.ps1 -Step secrets -LegacyFullScan

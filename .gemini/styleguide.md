@@ -1,3 +1,16 @@
+### Terraform Versioning
+- Every provider in `required_providers` must declare a version constraint (pessimistic `~>` or explicit upper bound).
+- Commit and review `.terraform.lock.hcl`; unexpected changes should arrive only via dependency upgrade PRs.
+- New providers without constraints should be flagged.
+- Prefer `~> X.Y` (patch updates) for stability unless rapid minor adoption is required.
+
+### Secret Hygiene Extensions
+- Classify detections: CRITICAL (private keys, Age secret key), HIGH (cloud/API tokens), MEDIUM (JWT / generic high-entropy), LOW (informational).
+- Fail threshold defaults to HIGH (`SECRET_VALIDATOR_FAIL_LEVEL` env). Lower levels are reported as warnings.
+- High-entropy heuristic uses adjustable threshold (`VALIDATOR_ENTROPY_THRESHOLD`).
+- Placeholders and known templates are ignored to reduce noise.
+- Encrypted artifact headers (SOPS/Age) should not trigger plaintext warnings.
+- Reports: JSON + SARIF include severity and token prefix for triage; only severities >= configured report level included.
 # Pinto-Bean Repository Review Guide
 
 This style guide augments Gemini's default review focus areas with project-specific expectations.

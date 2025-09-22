@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+import hashlib
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SECRET_DIRS = [
@@ -27,11 +28,38 @@ SECRET_DIRS = [
 ALLOWED_JSON_SUFFIX = ".json.encrypted"
 PLAIN_JSON_BLOCKLIST = re.compile(r".+\.json$")  # not currently used but kept for future refinement
 SENSITIVE_KEY_PATTERN = re.compile(r"(API|SECRET|TOKEN|KEY|PASSWORD|PASS)$", re.IGNORECASE)
-HIGH_ENTROPY_THRESHOLD = 4.0  # bits/char approximate
+HIGH_ENTROPY_THRESHOLD = 4.0  # bits/char approximate (configurable via ENV: VALIDATOR_ENTROPY_THRESHOLD)
 MIN_SECRET_LENGTH = 20
 DETECT_BASELINE = REPO_ROOT / ".secrets.baseline"  # retained for optional legacy full scan mode
 
 violations: list[str] = []
+
+# Structured findings (rule_id, severity, message, file, token_prefix)
+findings: list[dict[str, str]] = []
+
+# Allow placeholders / benign markers
+PLACEHOLDER_PATTERNS = [
+    re.compile(r"<[^>]+>"),
+    re.compile(r"^(CHANGE(ME)?|TODO|EXAMPLE|SAMPLE|DUMMY|PLACEHOLDER)$", re.IGNORECASE),
+]
+
+# Patterns with explicit rule ids and severity mapping
+PATTERN_DEFINITIONS: list[tuple[str, str, re.Pattern[str]]] = [
+    ("AWS_ACCESS_KEY", "HIGH", re.compile(r"AKIA[0-9A-Z]{16}")),
+    ("GITHUB_PAT", "HIGH", re.compile(r"ghp_[A-Za-z0-9]{36}")),
+    ("GITHUB_PAT_NEW", "HIGH", re.compile(r"github_pat_[A-Za-z0-9_]{22,}")),
+    ("JWT_TOKEN", "MEDIUM", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}")),
+    ("AGE_PRIVATE_KEY", "CRITICAL", re.compile(r"^AGE-SECRET-KEY-[A-Z0-9]{59}$")),
+]
+
+FAIL_LEVEL = os.getenv("SECRET_VALIDATOR_FAIL_LEVEL", "HIGH").upper()  # CRITICAL|HIGH|MEDIUM|LOW
+LEVEL_ORDER = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+
+ENTROPY_FAIL_LEVEL = os.getenv("SECRET_VALIDATOR_ENTROPY_LEVEL", "HIGH").upper()
+ENTROPY_THRESHOLD = float(os.getenv("VALIDATOR_ENTROPY_THRESHOLD", str(HIGH_ENTROPY_THRESHOLD)))
+
+CACHE_PATH = REPO_ROOT / ".cache" / "secret-validator.json"
+_cache: dict[str, dict[str, str]] = {}
 
 
 def sh(cmd: list[str]) -> str:
@@ -69,6 +97,41 @@ def scan_plain_json() -> None:
             violations.append(f"Plain JSON secret present: {rel}")
 
 
+def _load_cache() -> None:
+    if CACHE_PATH.exists():
+        try:
+            _cache.update(json.loads(CACHE_PATH.read_text()))
+        except Exception:
+            pass
+
+
+def _save_cache() -> None:
+    try:
+        if not CACHE_PATH.parent.exists():
+            CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(CACHE_PATH, "w", encoding="utf-8") as fh:
+            json.dump(_cache, fh, indent=2)
+    except Exception:
+        pass
+
+
+def classify(rule_id: str, severity: str, message: str, file: str, token: str | None = None) -> None:
+    findings.append(
+        {
+            "rule_id": rule_id,
+            "severity": severity,
+            "message": message,
+            "file": file,
+            "token_prefix": token[:8] + "..." if token else "",
+        }
+    )
+    violations.append(message)
+
+
+def _is_placeholder(token: str) -> bool:
+    return any(p.fullmatch(token) for p in PLACEHOLDER_PATTERNS)
+
+
 def scan_git_index() -> None:
     # list staged or committed files (tracked) to evaluate suspicious high entropy strings
     try:
@@ -99,33 +162,38 @@ def scan_git_index() -> None:
         for match in secret_like.findall(text):
             if len(match) < MIN_SECRET_LENGTH:
                 continue
+            if _is_placeholder(match):
+                continue
             ent = calc_entropy(match)
             if (
-                ent >= HIGH_ENTROPY_THRESHOLD
+                ent >= ENTROPY_THRESHOLD
                 and not rel.startswith("infra/terraform/secrets/")
                 and not rel.startswith("infra/terraform/github/secrets/")
             ):
-                # Skip if token looks like a path or terraform directory fragment (common false positives)
                 if path_fragment.search(match):
                     continue
-                # Skip explicit validator related env var examples
                 if match.startswith("VALIDATOR_"):
                     continue
-                # age public key recipient (harmless and expected)
                 if match.startswith("age1"):
                     continue
-                # Skip script/tool names that look entropy-ish
-                if (
-                    match.startswith("BulkApply")
-                    or match.startswith("ApplySecrets")
-                    or match.startswith("GetTfc")
-                    or match.startswith("QueueTfc")
-                    or match.startswith("SetTfc")
-                ):
+                if match.startswith(("BulkApply", "ApplySecrets", "GetTfc", "QueueTfc", "SetTfc")):
                     continue
-                violations.append(
-                    f"Potential secret (high entropy) in {rel}: '{match[:8]}...' entropy={ent:.2f}"
+                sev = ENTROPY_FAIL_LEVEL if LEVEL_ORDER.get(ENTROPY_FAIL_LEVEL, 3) >= 3 else "MEDIUM"
+                classify(
+                    "HIGH_ENTROPY_TOKEN",
+                    sev,
+                    f"Potential secret (entropy={ent:.2f}) in {rel}: '{match[:8]}...'",
+                    rel,
+                    match,
                 )
+
+        # Explicit pattern scans (line independent)
+        for rule_id, sev, pattern in PATTERN_DEFINITIONS:
+            for m in pattern.findall(text):
+                # Avoid duplicate Age private key detection outside standard location
+                if rule_id == "AGE_PRIVATE_KEY" and rel.endswith("age.key"):
+                    continue
+                classify(rule_id, sev, f"{rule_id} candidate in {rel}", rel, m)
 
 
 def check_age_key() -> None:
@@ -136,7 +204,7 @@ def check_age_key() -> None:
                 content_first = k.read_text().splitlines()[0]
             except Exception:
                 content_first = ""
-            if "SECRET-KEY" in content_first:
+                if "SECRET-KEY" in content_first:
                 # ensure it's ignored by git
                 try:
                     status = sh(
@@ -227,10 +295,14 @@ def emit_reports(violations: list[str]) -> None:
     if not (sarif_path or json_path):
         return
     timestamp = datetime.datetime.utcnow().isoformat() + "Z"
+    # Determine minimum severity for inclusion
+    min_level = LEVEL_ORDER.get(os.getenv("VALIDATOR_REPORT_LEVEL", "LOW").upper(), 1)
+    filtered_findings = [f for f in findings if LEVEL_ORDER.get(f["severity"], 0) >= min_level]
+
     if json_path:
         try:
             with open(json_path, "w", encoding="utf-8") as jf:
-                json.dump({"timestamp": timestamp, "violations": violations}, jf, indent=2)
+                json.dump({"timestamp": timestamp, "findings": filtered_findings}, jf, indent=2)
         except Exception as e:
             print(f"Could not write JSON report: {e}", file=sys.stderr)
     if sarif_path:
@@ -242,12 +314,12 @@ def emit_reports(violations: list[str]) -> None:
                     "tool": {"driver": {"name": "pinto-bean-secret-validator", "version": "1.0.0"}},
                     "results": [
                         {
-                            "ruleId": "SECRET-CHECK",
-                            "level": "error",
-                            "message": {"text": v},
+                            "ruleId": f["rule_id"],
+                            "level": "error" if LEVEL_ORDER.get(f["severity"], 0) >= 3 else "note",
+                            "message": {"text": f["message"]},
                             "locations": [],
                         }
-                        for v in violations
+                        for f in filtered_findings
                     ],
                 }
             ],
@@ -260,6 +332,7 @@ def emit_reports(violations: list[str]) -> None:
 
 
 if __name__ == "__main__":
+    _load_cache()
     scan_plain_json()
     check_age_key()
     scan_git_index()
@@ -267,7 +340,22 @@ if __name__ == "__main__":
         legacy_run_detect_secrets()
         legacy_run_gitleaks()
     emit_reports(violations)
-    if violations:
-        print("Secret validation FAILED:\n" + "\n".join(f" - {v}" for v in violations))
+    _save_cache()
+    # Fail decision based on highest severity meeting FAIL_LEVEL
+    highest = 0
+    for f in findings:
+        level = LEVEL_ORDER.get(f["severity"], 0)
+        if level > highest:
+            highest = level
+    fail_threshold = LEVEL_ORDER.get(FAIL_LEVEL, 3)
+    if highest >= fail_threshold:
+        print("Secret validation FAILED (threshold {}):".format(FAIL_LEVEL))
+        for f in findings:
+            if LEVEL_ORDER.get(f["severity"], 0) >= fail_threshold:
+                print(f" - [{f['severity']}] {f['message']}")
         sys.exit(1)
+    if violations:
+        print("Secret validation WARNINGS:")
+        for f in findings:
+            print(f" - [{f['severity']}] {f['message']}")
     print("Secret validation PASSED")

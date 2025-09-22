@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml)
 [![Trivy Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml)
 [![Weekly Secret Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml)
-[![Renovate Dashboard](https://img.shields.io/badge/renovate-dashboard-brightgreen?logo=renovatebot)](../../issues/1)
+[![Renovate Dashboard](https://img.shields.io/badge/renovate-dashboard-brightgreen?logo=renovatebot)](https://github.com/GiantCroissant-Lunar/pinto-bean/issues)  
 
 Infrastructure automation for GitHub repository management via Terraform Cloud.
 
@@ -12,12 +12,11 @@ Infrastructure automation for GitHub repository management via Terraform Cloud.
 
 ## Secrets & Tokens
 
-Terraform Cloud token (TFC_TOKEN) is sourced exclusively from an encrypted `terraform.json.encrypted` (legacy `terraform.json.sops.json` and `terraform.json.encrypted.json` still supported) in `infra/terraform/secrets/`.
-Example template plaintext (committed scaffold) `infra/terraform/secrets/terraform.json` before encryption (contains only placeholders — safe to keep):
+Terraform Cloud token (TFC_TOKEN) is sourced exclusively from an encrypted `terraform.json.encrypted` (legacy `terraform.json.sops.json` and `terraform.json.encrypted.json` still supported) in `infra/terraform/secrets/`. Example template plaintext (committed scaffold) `infra/terraform/secrets/terraform.json` before encryption (contains only placeholders ??safe to keep):
 ```
 {
-	"TFC_TOKEN": "<terraform-cloud-api-token>",
-	"GITHUB_TOKEN": "<github-pat-or-gha-app-token>"
+        "TFC_TOKEN": "<terraform-cloud-api-token>",
+        "GITHUB_TOKEN": "<github-pat-or-gha-app-token>"
 }
 ```
 Encrypt it:
@@ -25,9 +24,7 @@ Encrypt it:
 pwsh infra/terraform/scripts/Encrypt-Secrets.ps1 -TerraformJson
 ```
 This creates `terraform.json.encrypted`; commit only the encrypted file (the placeholder template may remain for onboarding).
-
 `Apply-SecretsJson.ps1` skips `TFC_TOKEN` (never stored as a Terraform workspace variable) but pushes `GITHUB_TOKEN` (as env) plus other keys. The GitHub Actions workflow decrypts and must find `TFC_TOKEN`; pipeline fails if absent.
-
 ## Age Key
 
 Store the private age key in repository secret `AGE_KEY` for CI decryption. Generate with:
@@ -53,7 +50,6 @@ Layers now:
 3. CI: runs the same `pre-commit` hooks plus the custom validator (and can still emit SARIF/JSON artifacts).
 
 Legacy full scan mode: set `LEGACY_FULL_SCAN=1` to have the validator also invoke `detect-secrets` + `gitleaks` (useful for isolated debugging in CI).
-
 Optional report outputs (CI friendly):
 ```
 VALIDATOR_JSON=secret-scan.json
@@ -76,7 +72,7 @@ git add .secrets.baseline
 
 ## Local Quality (QA) Runner
 
-Use the consolidated PowerShell script (cross‑platform) to run all quality gates:
+Use the consolidated PowerShell script (cross?latform) to run all quality gates:
 
 Run everything:
 ```
@@ -120,5 +116,4 @@ CI caches:
 
 ## Automated Dependency Updates
 
-A `dependabot.yml` (or Renovate config) can keep Actions, Python, Terraform, and NuGet dependencies current with
-batched weekly PRs. (Added in this branch.)
+A `dependabot.yml` (or Renovate config) can keep Actions, Python, Terraform, and NuGet dependencies current with batched weekly PRs. (Added in this branch.)

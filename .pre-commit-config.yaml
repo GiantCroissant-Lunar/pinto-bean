@@ -93,6 +93,11 @@ repos:
         language: python
         entry: python scripts/python/tools/hooks/binary_blocker.py
         pass_filenames: false
+      - id: terraform-provider-version-check
+        name: "Terraform: enforce provider version constraints"
+        language: python
+        entry: python scripts/python/tools/hooks/terraform_provider_version_check.py
+        files: \.tf$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.9
