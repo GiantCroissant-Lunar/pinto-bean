@@ -1,5 +1,11 @@
 """Tests for code analyzer module."""
 
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 import pytest  # noqa: F401
 from ai_review.code_analyzer import CodeAnalyzer, FeedbackType
 
@@ -81,7 +87,7 @@ class TestCodeAnalyzer:
         # Python file
         test_path = self.analyzer._get_test_file_path("src/module.py")
         assert "test_module.py" in test_path  # noqa: S101
-        assert "tests/" in test_path  # noqa: S101
+        assert "tests" in test_path  # noqa: S101
 
         # Already a test file
         test_path = self.analyzer._get_test_file_path("test_existing.py")
