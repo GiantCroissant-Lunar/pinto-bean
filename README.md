@@ -1,14 +1,18 @@
 # pinto-bean
 
+[![Pre-Commit](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/pre-commit.yml)
 [![CodeQL](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml)
 [![Trivy Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml)
+[![Weekly Secret Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml)
 
 Infrastructure automation for GitHub repository management via Terraform Cloud.
 
+> Secret scanning layers: Pre-commit hooks (gitleaks + detect-secrets) + custom validator + weekly full scan.
+
 ## Secrets & Tokens
 
-Terraform Cloud token (TFC_TOKEN) is sourced exclusively from an encrypted `terraform.json.encrypted` (legacy `terraform.json.sops.json` and `terraform.json.encrypted.json` still supported) in `infra/terraform/secrets/`.
-
+Terraform Cloud token (TFC_TOKEN) is sourced exclusively from an encrypted `terraform.json.encrypted` (legacy `
+terraform.json.sops.json` and `terraform.json.encrypted.json` still supported) in `infra/terraform/secrets/`.
 Example template plaintext (committed scaffold) `infra/terraform/secrets/terraform.json` before encryption (contains only placeholders — safe to keep):
 ```
 {
@@ -113,3 +117,8 @@ CI caches:
 1. Populate & encrypt `terraform.json` (ensure TFC_TOKEN present) and commit only the encrypted file.
 2. Remove any repository secret named `TFC_TOKEN` (no longer used).
 3. Rotate tokens periodically; re-encrypt after edits (script re-runs are idempotent).
+
+## Automated Dependency Updates
+
+A `dependabot.yml` (or Renovate config) can keep Actions, Python, Terraform, and NuGet dependencies current with
+batched weekly PRs. (Added in this branch.)
