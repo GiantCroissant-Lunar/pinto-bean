@@ -8,3 +8,8 @@ scripts/python/.ruff_cache/
 scripts/python/.pytest_cache/
 scripts/python/.coverage
 scripts/python/coverage.xml
+
+# Node.js dependencies
+scripts/nodejs/node_modules/
+scripts/nodejs/package-lock.json
+dist/
