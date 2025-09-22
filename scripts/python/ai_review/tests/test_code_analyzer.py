@@ -17,43 +17,43 @@ class TestCodeAnalyzer:
         result = self.analyzer.analyze_feedback(comment)
         assert result == FeedbackType.BUG_FIX  # noqa: S101
 
-    def test_analyze_feedback_improvement(self) -> None:
+    def test_feedback_improvement(self) -> None:
         """Test improvement detection."""
         comment = "This could be optimized for better performance"
         result = self.analyzer.analyze_feedback(comment)
         assert result == FeedbackType.IMPROVEMENT  # noqa: S101
 
-    def test_analyze_feedback_test_request(self) -> None:
+    def test_feedback_test_request(self) -> None:
         """Test test request detection."""
         comment = "Please add unit tests for this function"
         result = self.analyzer.analyze_feedback(comment)
         assert result == FeedbackType.TEST_REQUEST  # noqa: S101
 
-    def test_analyze_feedback_documentation(self) -> None:
+    def test_feedback_documentation(self) -> None:
         """Test documentation request detection."""
         comment = "This needs better documentation and comments"
         result = self.analyzer.analyze_feedback(comment)
         assert result == FeedbackType.DOCUMENTATION  # noqa: S101
 
-    def test_analyze_feedback_security(self) -> None:
+    def test_feedback_security(self) -> None:
         """Test security concern detection."""
         comment = "This code is vulnerable to injection attacks"
         result = self.analyzer.analyze_feedback(comment)
         assert result == FeedbackType.SECURITY  # noqa: S101
 
-    def test_analyze_feedback_performance(self) -> None:
+    def test_feedback_performance(self) -> None:
         """Test performance concern detection."""
         comment = "This is too slow and uses too much memory"
         result = self.analyzer.analyze_feedback(comment)
         assert result == FeedbackType.PERFORMANCE  # noqa: S101
 
-    def test_analyze_feedback_general(self) -> None:
+    def test_feedback_general(self) -> None:
         """Test general feedback fallback."""
         comment = "Random comment that doesn't fit patterns"
         result = self.analyzer.analyze_feedback(comment)
         assert result == FeedbackType.GENERAL  # noqa: S101
 
-    def test_suggest_modifications_bug_fix(self) -> None:
+    def test_modifications_bug_fix(self) -> None:
         """Test bug fix suggestions."""
         suggestions = self.analyzer.suggest_modifications(
             FeedbackType.BUG_FIX, "Fix this bug", "test.py", 10
@@ -61,7 +61,7 @@ class TestCodeAnalyzer:
         assert len(suggestions) >= 1  # noqa: S101
         assert suggestions[0]["type"] == "add_comment"  # noqa: S101
 
-    def test_suggest_modifications_test_request(self) -> None:
+    def test_modifications_test_request(self) -> None:
         """Test test creation suggestions."""
         suggestions = self.analyzer.suggest_modifications(
             FeedbackType.TEST_REQUEST, "Add tests", "src/module.py", 15
