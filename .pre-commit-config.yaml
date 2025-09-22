@@ -1,0 +1,119 @@
+---
+minimum_pre_commit_version: "3.6.0"
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=10240"]
+      - id: forbid-new-submodules
+      - id: check-yaml
+        files: \.(yml|yaml)$
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        files: \.(yml|yaml)$
+        args: ["-d", "{extends: default, rules: {line-length: {max: 120}, new-lines: disable}}"]
+
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+        name: gitleaks (staged, redact)
+        args: ["protect", "--staged", "--redact"]
+        stages: [pre-commit]
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: detect-secrets (baseline enforced)
+        args: ["--baseline", ".secrets.baseline"]
+        stages: [pre-commit]
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.29.1
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+        additional_dependencies: ["commitizen"]
+
+  # Removed dotnet-format hook (no .NET projects present). Re-add when solution exists.
+
+  - repo: local
+    hooks:
+      - id: secrets-validator
+        name: "Custom secrets validation"
+        language: python
+        entry: python scripts/python/validate_secrets.py
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: unity-meta-check
+        name: "Unity: ensure .meta files exist for changed assets"
+        language: python
+        entry: python scripts/python/tools/hooks/unity_meta_check.py
+        files: |
+          (?x)
+          \.(cs|asmdef|unity|prefab|mat|asset|controller|anim|shader(Graph)?|guiskin|ttf|otf|wav|mp3|ogg|png|jpg|jpeg|tga|psd|fbx|obj|hdr|exr|cubemap)$
+      - id: unity-packages-lock-check
+        name: "Unity: packages-lock.json must update when manifest.json changes"
+        language: python
+        entry: python scripts/python/tools/hooks/unity_packages_lock_check.py
+        files: ^Packages/(manifest\.json|packages-lock\.json)$
+        pass_filenames: false
+      - id: lfs-enforce
+        name: Enforce LFS for large/binary Unity assets
+        language: python
+        entry: python scripts/python/tools/hooks/lfs_enforce.py
+        files: |
+          (?x)
+          \.(psd|fbx|mp4|mov|avi|wav|aiff|aif|flac|png|jpg|jpeg|tga|exr|hdr|zip|7z|rar|dll|pdb|so|dylib)$
+      - id: block-library-temp-obj-build
+        name: Block Unity generated folders from being committed
+        language: python
+        entry: python scripts/python/tools/hooks/unity_folder_blocker.py
+        pass_filenames: false
+      - id: binary-blocker
+        name: Block compiled binaries accidentally staged
+        language: python
+        entry: python scripts/python/tools/hooks/binary_blocker.py
+        pass_filenames: false
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        args: ["--fix"]
+        files: |
+          (?x)
+          ^tools/.*\.py$|
+          ^scripts/.*\.py$|
+          ^.*\.py$
+      - id: ruff-format
+        name: ruff (format)
+        files: |
+          (?x)
+          ^tools/.*\.py$|
+          ^scripts/.*\.py$|
+          ^.*\.py$
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        additional_dependencies: ["types-PyYAML"]
+        files: |
+          (?x)
+          ^tools/.*\.py$|
+          ^scripts/.*\.py$|
+          ^.*\.py$

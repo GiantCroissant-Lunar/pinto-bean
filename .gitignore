@@ -1,0 +1,7 @@
+.secrets/
+.vscode/
+
+.mypy_cache/
+.ruff_cache/
+scripts/python/.mypy_cache/
+scripts/python/.ruff_cache/

@@ -1,0 +1,52 @@
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Markdown: keep trailing spaces (for line breaks) and allow longer lines
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# YAML specifics (keep 2 spaces)
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Python (match Ruff default 4 spaces indent inside blocks but global indent_size here doesn't matter per-file)
+[*.py]
+indent_size = 4
+
+# Terraform (2 spaces typical)
+[*.tf]
+indent_size = 2
+
+# JSON / JSONC
+[*.{json,jsonc}]
+indent_size = 2
+
+# Shell / PowerShell
+[*.{sh,bash,ps1}]
+indent_size = 2
+
+# C# (dotnet format will refine; use 4)
+[*.{cs,csx}]
+indent_size = 4
+
+# Makefiles must use tabs
+[Makefile]
+indent_style = tab
+
+# GitHub workflows
+[.github/workflows/*.yml]
+indent_size = 2
+
+# Ignore generated Unity folders if edited (no specific rules, just placeholder example)
+[Library/**]
+indent_style = unset
+trim_trailing_whitespace = false

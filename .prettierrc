@@ -1,0 +1,13 @@
+{
+  "useTabs": false,
+  "tabWidth": 2,
+  "printWidth": 100,
+  "overrides": [
+    {
+      "files": ".github/workflows/*.y?(a)ml",
+      "options": {
+        "useTabs": false,
+        "tabWidth": 2 }
+    }
+  ]
+}
