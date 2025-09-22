@@ -1,0 +1,22 @@
+have_fun: false
+code_review:
+  disable: false
+  comment_severity_threshold: MEDIUM
+  max_review_comments: 40
+  pull_request_opened:
+    help: false
+    summary: true
+    code_review: true
+    include_drafts: true
+ignore_patterns:
+  - "**/.mypy_cache/**"
+  - "**/.ruff_cache/**"
+  - "**/.pytest_cache/**"
+  - "**/Library/**"          # Unity generated
+  - "**/Temp/**"             # Unity generated
+  - "**/Obj/**"              # Unity build/temp
+  - "**/Build/**"            # Unity build output
+  - "**/infra/terraform/**/.terraform/**"
+  - "**/*.lock"              # Skip generic lockfiles (NuGet, etc.)
+  - "**/*.bin"
+  - "**/scripts/python/tools/hooks/**" # Small local hook scripts (already tested)
