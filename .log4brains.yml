@@ -3,3 +3,5 @@ project:
   tz: Asia/Taipei
   adrFolder: ./docs/adr
   packages: []
+  # Note: Log4brains will be run from scripts/nodejs/packages/dev-tools
+  # but still references the original ADR folder location
