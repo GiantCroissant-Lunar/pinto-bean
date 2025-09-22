@@ -106,8 +106,8 @@ Invoke-QAStep -Name 'format' -Block {
 Invoke-QAStep -Name 'tests' -Block {
   # Run pytest with coverage (xml + terminal summary); requires pytest + pytest-cov installed.
   if (-not (Get-Command pytest -ErrorAction SilentlyContinue)) { Write-Error 'pytest not installed (pip install pytest pytest-cov)'; return }
-  pytest --cov=scripts/python --cov-report=term-missing --cov-report=xml:coverage.xml
-  if (-not (Test-Path coverage.xml)) { Write-Error 'coverage.xml not produced' }
+  pytest --cov=scripts/python --cov-report=term-missing --cov-report=xml:scripts/python/coverage.xml
+  if (-not (Test-Path scripts/python/coverage.xml)) { Write-Error 'coverage.xml not produced' }
 }
 
 if ($failures.Count -gt 0) {

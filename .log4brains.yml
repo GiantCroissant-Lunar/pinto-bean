@@ -1,0 +1,5 @@
+project:
+  name: pinto-bean
+  tz: Asia/Taipei
+  adrFolder: ./docs/adr
+  packages: []

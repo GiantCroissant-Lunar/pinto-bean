@@ -33,6 +33,9 @@ HIGH_ENTROPY_THRESHOLD = (
 MIN_SECRET_LENGTH = 20
 DETECT_BASELINE = REPO_ROOT / ".secrets.baseline"  # retained for optional legacy full scan mode
 
+# Recognize ADR-style filename stems (e.g., 20250922-use-something-long) to reduce false positives
+ADR_TOKEN_RE = re.compile(r"^[0-9]{8}-[a-z0-9][a-z0-9-]{10,}$")
+
 violations: list[str] = []
 
 # Structured findings (rule_id, severity, message, file, token_prefix)
@@ -171,6 +174,9 @@ def scan_git_index() -> None:
             if len(match) < MIN_SECRET_LENGTH:
                 continue
             if _is_placeholder(match):
+                continue
+            # Skip ADR filename stems (date + slug) which look random enough to trip entropy
+            if ADR_TOKEN_RE.match(match.lower()):
                 continue
             ent = calc_entropy(match)
             if (
