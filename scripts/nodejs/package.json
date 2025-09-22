@@ -1,0 +1,21 @@
+{
+  "name": "pinto-bean-nodejs-tools",
+  "version": "1.0.0",
+  "description": "Node.js tools and dependencies for pinto-bean project",
+  "main": "index.js",
+  "scripts": {
+    "adr:preview": "log4brains preview",
+    "adr:build": "log4brains-web build",
+    "adr:new": "log4brains adr new"
+  },
+  "keywords": [
+    "adr",
+    "architecture",
+    "documentation"
+  ],
+  "author": "GiantCroissant-Lunar",
+  "license": "MIT",
+  "devDependencies": {
+    "log4brains": "^1.1.0"
+  }
+}
