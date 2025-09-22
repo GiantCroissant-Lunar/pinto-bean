@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "group:allNonMajor",
+    "schedule:weekly"
+  ],
+  "timezone": "Etc/UTC",
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10,
+  "rangeStrategy": "bump",
+  "ignoreTests": true,
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "actions (minor & patch)",
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "matchManagers": ["pip_requirements"],
+      "groupName": "python dev deps",
+      "matchPackageNames": ["ruff", "mypy", "pytest"],
+      "automerge": false,
+      "labels": ["deps", "python"]
+    },
+    {
+      "matchManagers": ["terraform"],
+      "groupName": "terraform providers",
+      "matchDepTypes": ["requirement"],
+      "automerge": false,
+      "labels": ["deps", "terraform"]
+    },
+    {
+      "matchManagers": ["nuget"],
+      "groupName": "nuget non-major",
+      "automerge": false,
+      "labels": ["deps", "dotnet"]
+    }
+  ],
+  "enabledManagers": ["github-actions", "pip_requirements", "terraform", "nuget"],
+  "commitMessagePrefix": "chore(deps): ",
+  "dependencyDashboard": true
+}
