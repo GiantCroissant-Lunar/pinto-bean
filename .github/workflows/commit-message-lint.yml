@@ -1,0 +1,33 @@
+---
+name: commit-message-lint
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit messages (R-GIT-010)
+        run: |
+          set -euo pipefail
+          RANGE="${{ github.event.pull_request.base.sha || 'HEAD~10' }}..${{ github.sha }}"
+          fail=0
+          for hash in $(git rev-list --no-merges $RANGE); do
+            subject="$(git log -1 --pretty=%s "$hash")"
+            body="$(git log -1 --pretty=%b "$hash")"
+
+            if echo "$subject $body" | grep -q '\\n'; then
+              echo "::error ::Commit $hash contains literal \\n (violates R-GIT-010)"
+              fail=1
+            fi
+            if [ ${#subject} -gt 72 ]; then
+              echo "::warning ::Commit $hash subject exceeds 72 chars"
+            fi
+          done
+          exit $fail

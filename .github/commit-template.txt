@@ -1,0 +1,13 @@
+<type>(<scope>): <subject up to 72 chars>
+
+Why:
+- <context>
+
+What changed:
+- <bullets>
+
+Verification:
+- <how you tested>
+
+Notes:
+- <rollout/rollback, follow-ups>
