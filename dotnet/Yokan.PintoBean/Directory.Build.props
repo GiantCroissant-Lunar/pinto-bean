@@ -1,0 +1,31 @@
+<Project>
+  <PropertyGroup>
+    <!-- Language Version -->
+    <LangVersion>latest</LangVersion>
+    
+    <!-- Nullable Reference Types -->
+    <Nullable>enable</Nullable>
+    
+    <!-- Treat Warnings as Errors -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors />
+    
+    <!-- AOT-friendly settings -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    
+    <!-- General settings -->
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    
+    <!-- Package metadata defaults -->
+    <Company>GiantCroissant</Company>
+    <Product>Yokan PintoBean</Product>
+    <Copyright>Copyright © GiantCroissant</Copyright>
+    <PackageProjectUrl>https://github.com/GiantCroissant-Lunar/pinto-bean</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/GiantCroissant-Lunar/pinto-bean</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

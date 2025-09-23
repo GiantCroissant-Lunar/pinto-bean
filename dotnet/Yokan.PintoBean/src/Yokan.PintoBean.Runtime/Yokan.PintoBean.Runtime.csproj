@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Yokan.PintoBean.Runtime</RootNamespace>
+    <PackageId>GiantCroissant.Yokan.PintoBean.Runtime</PackageId>
+    <Description>Tier-3 adapters and registry runtime for Yokan PintoBean service platform</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

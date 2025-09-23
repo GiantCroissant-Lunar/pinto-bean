@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Yokan.PintoBean.Runtime.Tests</name>
+    </assembly>
+    <members>
+        <member name="T:Yokan.PintoBean.Runtime.Tests.RuntimeTests">
+            <summary>
+            Basic test class for Runtime functionality.
+            </summary>
+        </member>
+        <member name="M:Yokan.PintoBean.Runtime.Tests.RuntimeTests.Version_ShouldBeAccessible">
+            <summary>
+            Tests that the Runtime version is accessible.
+            </summary>
+        </member>
+    </members>
+</doc>

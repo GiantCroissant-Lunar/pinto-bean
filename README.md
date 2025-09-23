@@ -2,12 +2,15 @@
 
 [![Pre-Commit](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/pre-commit.yml)
 [![CodeQL](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml)
+[![.NET CI](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/dotnet.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/dotnet.yml)
 [![Trivy Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml)
 [![Weekly Secret Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml)
 [![Renovate Dashboard](https://img.shields.io/badge/renovate-dashboard-brightgreen?logo=renovatebot)](https://github.com/GiantCroissant-Lunar/pinto-bean/issues)  
 [![Architecture Decisions](https://img.shields.io/badge/architecture-decisions-blue?logo=readthedocs)](https://giantcroissant-lunar.github.io/pinto-bean/)
 
 Infrastructure automation for GitHub repository management via Terraform Cloud.
+
+**🎯 Yokan PintoBean**: Cross-engine service platform with 4-tier architecture (contracts, code generation, runtime, providers) - see [`dotnet/Yokan.PintoBean/`](dotnet/Yokan.PintoBean/)
 
 > 📚 **[Architecture Decision Records](https://giantcroissant-lunar.github.io/pinto-bean/)** - Browse our architectural decisions and their context> Secret scanning layers: Pre-commit hooks (gitleaks + detect-secrets) + custom validator + weekly full scan.
 
@@ -108,6 +111,26 @@ The script internally:
 CI caches:
 - Pre-commit environments (~/.cache/pre-commit)
 - Tool caches: `.mypy_cache`, `.ruff_cache`, `.pytest_cache` for faster incremental runs.
+
+## Yokan PintoBean (.NET Platform)
+
+The `dotnet/Yokan.PintoBean/` directory contains a cross-engine service platform with 4-tier architecture:
+
+- **Tier-1**: `Yokan.PintoBean.Abstractions` - Contracts and interfaces
+- **Tier-2**: `Yokan.PintoBean.CodeGen` - Incremental source generators and analyzers  
+- **Tier-3**: `Yokan.PintoBean.Runtime` - Adapters and registry runtime
+- **Tier-4**: `Yokan.PintoBean.Providers.Stub` - Example provider implementations
+
+### Building and Testing
+
+```bash
+cd dotnet/Yokan.PintoBean
+dotnet build
+dotnet test
+dotnet run --project samples/PintoBean.Hello.Demo.Console
+```
+
+See [RFCs](docs/rfcs/) for detailed architecture documentation.
 
 ## Next Steps
 

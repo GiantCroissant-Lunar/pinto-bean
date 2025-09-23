@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Yokan.PintoBean.Runtime</name>
+    </assembly>
+    <members>
+        <member name="T:Yokan.PintoBean.Runtime.PintoBeanRuntime">
+            <summary>
+            Placeholder class for the Runtime project.
+            This will contain the actual adapters and registry runtime implementation.
+            </summary>
+        </member>
+        <member name="P:Yokan.PintoBean.Runtime.PintoBeanRuntime.Version">
+            <summary>
+            Gets the version of the Runtime library.
+            </summary>
+        </member>
+    </members>
+</doc>

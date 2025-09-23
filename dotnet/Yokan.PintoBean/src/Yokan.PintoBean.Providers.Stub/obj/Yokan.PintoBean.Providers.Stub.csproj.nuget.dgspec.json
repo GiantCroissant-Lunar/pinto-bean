@@ -1,0 +1,205 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Providers.Stub/Yokan.PintoBean.Providers.Stub.csproj": {}
+  },
+  "projects": {
+    "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj",
+        "projectName": "GiantCroissant.Yokan.PintoBean.Abstractions",
+        "projectPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj",
+        "packagesPath": "/home/runner/.nuget/packages/",
+        "outputPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Abstractions/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/runner/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.NET.ILLink.Tasks": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.19, )",
+              "autoReferenced": true
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/8.0.119/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Providers.Stub/Yokan.PintoBean.Providers.Stub.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Providers.Stub/Yokan.PintoBean.Providers.Stub.csproj",
+        "projectName": "GiantCroissant.Yokan.PintoBean.Providers.Stub",
+        "projectPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Providers.Stub/Yokan.PintoBean.Providers.Stub.csproj",
+        "packagesPath": "/home/runner/.nuget/packages/",
+        "outputPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Providers.Stub/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/runner/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj": {
+                "projectPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj"
+              },
+              "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Runtime/Yokan.PintoBean.Runtime.csproj": {
+                "projectPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Runtime/Yokan.PintoBean.Runtime.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.NET.ILLink.Tasks": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.19, )",
+              "autoReferenced": true
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/8.0.119/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Runtime/Yokan.PintoBean.Runtime.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Runtime/Yokan.PintoBean.Runtime.csproj",
+        "projectName": "GiantCroissant.Yokan.PintoBean.Runtime",
+        "projectPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Runtime/Yokan.PintoBean.Runtime.csproj",
+        "packagesPath": "/home/runner/.nuget/packages/",
+        "outputPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Runtime/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/runner/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj": {
+                "projectPath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.NET.ILLink.Tasks": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.19, )",
+              "autoReferenced": true
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/8.0.119/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

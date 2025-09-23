@@ -1,0 +1,13 @@
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/bin/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.deps.json
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/bin/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.dll
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/bin/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.pdb
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/bin/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.xml
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.csproj.AssemblyReference.cache
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.AssemblyInfoInputs.cache
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.AssemblyInfo.cs
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.csproj.CoreCompileInputs.cache
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.sourcelink.json
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.dll
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.xml
+/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.CodeGen/obj/Debug/netstandard2.0/Yokan.PintoBean.CodeGen.pdb

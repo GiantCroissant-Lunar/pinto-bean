@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "pxwl8YjB2TW23HR8r8dVIx7IXw6dAiGB7hywijrkKX6VPn4wrGDIKpsWDYrdcukHA303aAvM5M+/IxwwkIdl2Q==",
+  "success": true,
+  "projectFilePath": "/home/runner/work/pinto-bean/pinto-bean/dotnet/Yokan.PintoBean/src/Yokan.PintoBean.Runtime/Yokan.PintoBean.Runtime.csproj",
+  "expectedPackageFiles": [
+    "/home/runner/.nuget/packages/microsoft.net.illink.tasks/8.0.19/microsoft.net.illink.tasks.8.0.19.nupkg.sha512"
+  ],
+  "logs": []
+}
