@@ -11,6 +11,9 @@
     <WarningsAsErrors />
     <WarningsNotAsErrors />
     
+    <!-- Continuous Integration Build -->
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    
     <!-- AOT-friendly settings -->
     <IsAotCompatible>true</IsAotCompatible>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
@@ -19,6 +22,10 @@
     <!-- General settings -->
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    
+    <!-- Default naming conventions -->
+    <RootNamespace Condition="'$(RootNamespace)' == ''">$(MSBuildProjectName)</RootNamespace>
+    <PackageId Condition="'$(PackageId)' == '' AND !$(MSBuildProjectName.StartsWith('GiantCroissant.'))">GiantCroissant.$(MSBuildProjectName)</PackageId>
     
     <!-- Package metadata defaults -->
     <Company>GiantCroissant</Company>

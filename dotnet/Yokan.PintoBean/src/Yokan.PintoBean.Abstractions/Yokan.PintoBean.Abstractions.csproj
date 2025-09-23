@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>Yokan.PintoBean.Abstractions</RootNamespace>
-    <PackageId>GiantCroissant.Yokan.PintoBean.Abstractions</PackageId>
     <Description>Tier-1 contracts and abstractions for Yokan PintoBean service platform</Description>
   </PropertyGroup>
 

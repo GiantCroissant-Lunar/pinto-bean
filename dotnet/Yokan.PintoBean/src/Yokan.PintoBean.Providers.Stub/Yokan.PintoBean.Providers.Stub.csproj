@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>Yokan.PintoBean.Providers.Stub</RootNamespace>
-    <PackageId>GiantCroissant.Yokan.PintoBean.Providers.Stub</PackageId>
     <Description>Tier-4 example provider implementation for Yokan PintoBean service platform</Description>
   </PropertyGroup>
 
