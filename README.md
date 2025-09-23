@@ -4,11 +4,12 @@
 [![CodeQL](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/codeql.yml)
 [![Trivy Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/trivy.yml)
 [![Weekly Secret Scan](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml/badge.svg)](https://github.com/GiantCroissant-Lunar/pinto-bean/actions/workflows/weekly-secret-scan.yml)
-[![Renovate Dashboard](https://img.shields.io/badge/renovate-dashboard-brightgreen?logo=renovatebot)](https://github.com/GiantCroissant-Lunar/pinto-bean/issues)
+[![Renovate Dashboard](https://img.shields.io/badge/renovate-dashboard-brightgreen?logo=renovatebot)](https://github.com/GiantCroissant-Lunar/pinto-bean/issues)  
+[![Architecture Decisions](https://img.shields.io/badge/architecture-decisions-blue?logo=readthedocs)](https://giantcroissant-lunar.github.io/pinto-bean/)
 
 Infrastructure automation for GitHub repository management via Terraform Cloud.
 
-> Secret scanning layers: Pre-commit hooks (gitleaks + detect-secrets) + custom validator + weekly full scan.
+> 📚 **[Architecture Decision Records](https://giantcroissant-lunar.github.io/pinto-bean/)** - Browse our architectural decisions and their context> Secret scanning layers: Pre-commit hooks (gitleaks + detect-secrets) + custom validator + weekly full scan.
 
 ## Secrets & Tokens
 

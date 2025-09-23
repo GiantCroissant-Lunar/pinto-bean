@@ -1,0 +1,31 @@
+{
+  "name": "pinto-bean-workspace",
+  "version": "1.0.0",
+  "description": "PNPM workspace for pinto-bean documentation and development tools",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter dev-tools dev",
+    "dev:docs": "pnpm --filter docs-site start",
+    "dev:main": "pnpm --filter main-site dev",
+    "adr:preview": "pnpm --filter dev-tools adr:preview",
+    "adr:build": "pnpm --filter dev-tools adr:build",
+    "adr:new": "pnpm --filter dev-tools adr:new",
+    "build:all": "pnpm --recursive build",
+    "install:all": "pnpm install --recursive"
+  },
+  "keywords": [
+    "workspace",
+    "adr",
+    "architecture",
+    "documentation",
+    "docusaurus"
+  ],
+  "author": "GiantCroissant-Lunar",
+  "license": "MIT",
+  "devDependencies": {
+    "pm2": "^5.3.0",
+    "concurrently": "^8.2.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
