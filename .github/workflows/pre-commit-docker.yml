@@ -1,5 +1,5 @@
 ---
-name: Pre-Commit (PR Gate)
+name: Pre-Commit (Docker - Fast)
 
 'on':
   pull_request:
@@ -10,7 +10,7 @@ name: Pre-Commit (PR Gate)
       - '.pre-commit-config.yaml'
       - 'scripts/**'
       - 'tools/**'
-      - '.github/workflows/pre-commit.yml'
+      - '.github/workflows/pre-commit-docker.yml'
   workflow_dispatch: {}
 
 permissions:
@@ -19,49 +19,35 @@ permissions:
 
 jobs:
   pre-commit:
-    name: Run pre-commit hooks
+    name: Run pre-commit hooks (Docker)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    container:
+      image: ghcr.io/giantcroissant-lunar/pinto-bean/precommit:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-          cache: pip
+          # Need full history for pre-commit to work properly
+          fetch-depth: 0
 
       - name: Cache pre-commit environments
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          key: precommit-docker-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
           restore-keys: |
-            pre-commit-${{ runner.os }}-
+            precommit-docker-${{ runner.os }}-
 
-      - name: Cache mypy & ruff
-        uses: actions/cache@v4
-        with:
-          path: |
-            .mypy_cache
-            .ruff_cache
-          key: typecheck-lint-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml', 'scripts/python/requirements-dev.txt') }}
-          restore-keys: |
-            typecheck-lint-${{ runner.os }}-
-
-      - name: Install dev requirements
+      - name: Configure git (required for pre-commit)
         run: |
-          set -euo pipefail
-          if [ -f scripts/python/requirements-dev.txt ]; then
-            echo "[install] Installing dev requirements (with dependencies)" >&2
-            pip install -r scripts/python/requirements-dev.txt --upgrade-strategy eager
-          else
-            echo "[install] requirements-dev.txt missing; installing pre-commit only" >&2
-            pip install pre-commit
-          fi
-          pre-commit --version || { echo "pre-commit not installed" >&2; exit 1; }
+          git config --global --add safe.directory /github/workspace
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
 
       - name: Run pre-commit (changed files fast path)
         run: pre-commit run --show-diff-on-failure --color=always
@@ -95,12 +81,3 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: secret-scan-precommit.sarif
-
-      - name: Upload ruff / mypy caches (debug)
-        if: failure() && (hashFiles('.mypy_cache/**') != '' || hashFiles('.ruff_cache/**') != '')
-        uses: actions/upload-artifact@v4
-        with:
-          name: type-lint-caches
-          path: |
-            .mypy_cache
-            .ruff_cache
