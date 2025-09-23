@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SECRET_DIRS = [
@@ -35,6 +36,12 @@ DETECT_BASELINE = REPO_ROOT / ".secrets.baseline"  # retained for optional legac
 
 # Recognize ADR-style filename stems (e.g., 20250922-use-something-long) to reduce false positives
 ADR_TOKEN_RE = re.compile(r"^[0-9]{8}-[a-z0-9][a-z0-9-]{10,}$")
+
+# Skip metrics (reported at end for transparency)
+SKIP_METRICS: dict[str, Any] = {
+    "integrity_hashes": 0,
+    "integrity_files": set(),  # Set[str]
+}
 
 violations: list[str] = []
 
@@ -174,6 +181,12 @@ def scan_git_index() -> None:
             if len(match) < MIN_SECRET_LENGTH:
                 continue
             if _is_placeholder(match):
+                continue
+            # Ignore integrity hashes (sha512-BASE64) present in any *-lock.yaml file (e.g., pnpm-lock.yaml)
+            if rel.endswith("-lock.yaml") and match.startswith("sha512-"):
+                SKIP_METRICS["integrity_hashes"] = int(SKIP_METRICS["integrity_hashes"]) + 1
+                integrity_files: set[str] = SKIP_METRICS["integrity_files"]
+                integrity_files.add(rel)
                 continue
             # Skip ADR filename stems (date + slug) which look random enough to trip entropy
             if ADR_TOKEN_RE.match(match.lower()):
@@ -381,3 +394,11 @@ if __name__ == "__main__":  # pragma: no cover - complex integration logic, exer
             for f in findings:
                 print(f" - [{f['severity']}] {f['message']}")
         print("Secret validation PASSED")
+
+    # Report skip metrics (always informational, does not affect exit code)
+    if int(SKIP_METRICS["integrity_hashes"]):
+        integrity_files = SKIP_METRICS["integrity_files"]
+        files_count = len(integrity_files)
+        print(
+            f"[validator] Skipped {SKIP_METRICS['integrity_hashes']} integrity hash token(s) across {files_count} *-lock.yaml file(s)."
+        )

@@ -41,10 +41,22 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$RepoRoot = $PWD.Path
+$RepoRoot = (Get-Item -Path (Resolve-Path .)).FullName
 
-# Ensure we're in the correct directory
-Set-Location $RepoRoot
+# Ensure we operate from repository root (script may be invoked from subdirectory)
+try {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    # If script is inside repo root/scripts, move to repo root only if not already there
+    if (-not (Test-Path (Join-Path $PWD ".git"))) {
+        if (Test-Path (Join-Path $scriptDir ".." ".." ".git")) {
+            Set-Location (Resolve-Path (Join-Path $scriptDir ".." ".."))
+            $RepoRoot = (Get-Item -Path (Resolve-Path .)).FullName
+        }
+    }
+}
+catch {
+    Write-Host "⚠️  Failed to normalize working directory: $_" -ForegroundColor Yellow
+}
 
 function Write-Info($Message) {
     Write-Host "🔷 $Message" -ForegroundColor Cyan
@@ -112,8 +124,16 @@ function Build-Site {
     Write-Info "Building static ADR knowledge base..."
 
     try {
-        & log4brains-web build
-        Write-Success "Static site built successfully in ./dist/"
+        # Correct command for building the static site
+        & log4brains build
+        if (-not $?) { throw "log4brains build returned a non-zero exit code" }
+        $distDir = Join-Path $RepoRoot ".log4brains" "dist"
+        if (Test-Path $distDir) {
+            Write-Success "Static site built successfully in $distDir"
+        }
+        else {
+            Write-Info "Build finished but expected dist directory not found (looked in $distDir)."
+        }
     }
     catch {
         Write-Error-Custom "Failed to build site: $_"
@@ -122,14 +142,16 @@ function Build-Site {
 
 function New-ADR {
     if (-not $Title) {
-        Write-Error-Custom "Title is required for new ADR. Use: .\adr.ps1 new 'Your ADR Title'"
-        return
+         Write-Error-Custom "Title is required for new ADR. Use: .\adr.ps1 new 'Your ADR Title'"
+         return
     }
 
     Write-Info "Creating new ADR: $Title"
 
     try {
-        & log4brains adr new
+        # Pass the title through to log4brains (supports non-interactive creation)
+        & log4brains adr new --title "$Title"
+        if (-not $?) { throw "log4brains returned a non-zero exit code" }
         Write-Success "New ADR created successfully!"
     }
     catch {
@@ -141,18 +163,19 @@ function List-ADRs {
     Write-Info "Architecture Decision Records in docs/adr/:"
     Write-Host ""
 
-    $adrPath = Join-Path $RepoRoot "docs" "adr" "*.md"
-
-    if (-not (Test-Path (Join-Path $RepoRoot "docs" "adr"))) {
-        Write-Error-Custom "ADR directory does not exist: $(Join-Path $RepoRoot "docs" "adr")"
+    $adrDir = Join-Path $RepoRoot "docs/adr"
+    if (-not (Test-Path $adrDir)) {
+        Write-Error-Custom "ADR directory does not exist: $adrDir"
         return
     }
 
-    $adrFiles = Get-ChildItem -Path $adrPath | Where-Object { $_.Name -ne "index.md" -and $_.Name -ne "README.md" -and $_.Name -ne "template.md" }
+    $adrFiles = Get-ChildItem -Path (Join-Path $adrDir "*.md") -File |
+        Where-Object { $_.Name -notin @("index.md", "README.md", "template.md") }
 
     if ($adrFiles) {
         foreach ($file in $adrFiles | Sort-Object Name) {
-            $title = (Get-Content $file.FullName -First 10 | Where-Object { $_ -match "^#\s+(.+)" } | Select-Object -First 1) -replace "^#\s+", ""
+            $titleLine = Get-Content $file.FullName -First 15 | Where-Object { $_ -match "^#\s+(.+)" } | Select-Object -First 1
+            $title = if ($titleLine) { $titleLine -replace "^#\s+", "" } else { "(No title found)" }
             Write-Host "📋 $($file.Name) - $title"
         }
     }
