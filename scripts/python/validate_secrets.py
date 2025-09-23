@@ -37,6 +37,11 @@ DETECT_BASELINE = REPO_ROOT / ".secrets.baseline"  # retained for optional legac
 # Recognize ADR-style filename stems (e.g., 20250922-use-something-long) to reduce false positives
 ADR_TOKEN_RE = re.compile(r"^[0-9]{8}-[a-z0-9][a-z0-9-]{10,}$")
 
+# Standard UUID/GUID pattern (version agnostic); used to suppress false positives in entropy scan
+UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
 # Skip metrics (reported at end for transparency)
 SKIP_METRICS: dict[str, Any] = {
     "integrity_hashes": 0,
@@ -181,6 +186,9 @@ def scan_git_index() -> None:
             if len(match) < MIN_SECRET_LENGTH:
                 continue
             if _is_placeholder(match):
+                continue
+            # Skip canonical UUID/GUID tokens (common in project/solution files, not secrets)
+            if UUID_RE.match(match):
                 continue
             # Ignore integrity hashes (sha512-BASE64) present in any *-lock.yaml file (e.g., pnpm-lock.yaml)
             if rel.endswith("-lock.yaml") and match.startswith("sha512-"):
