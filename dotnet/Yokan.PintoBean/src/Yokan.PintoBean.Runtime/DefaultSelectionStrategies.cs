@@ -215,6 +215,147 @@ public sealed class PickOneSelectionStrategy<TService> : ISelectionStrategy<TSer
 }
 
 /// <summary>
+/// Default FanOut selection strategy that invokes all matched providers and aggregates results/failures.
+/// Supports fire-and-forget for void operations and aggregation for Task/ValueTask return types.
+/// </summary>
+/// <typeparam name="TService">The service contract type.</typeparam>
+public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TService>, ISelectionStrategy, IDisposable
+    where TService : class
+{
+    private readonly IServiceRegistry? _registry;
+    private readonly IResilienceExecutor? _resilienceExecutor;
+    private bool _disposed;
+
+    /// <summary>
+    /// Initializes a new instance of the FanOutSelectionStrategy class.
+    /// </summary>
+    /// <param name="registry">Optional service registry for provider change monitoring.</param>
+    /// <param name="resilienceExecutor">Optional resilience executor for fault handling.</param>
+    public FanOutSelectionStrategy(IServiceRegistry? registry = null, IResilienceExecutor? resilienceExecutor = null)
+    {
+        _registry = registry;
+        _resilienceExecutor = resilienceExecutor;
+    }
+
+    /// <inheritdoc />
+    public SelectionStrategyType StrategyType => SelectionStrategyType.FanOut;
+
+    /// <inheritdoc />
+    public Type ServiceType => typeof(TService);
+
+    /// <inheritdoc />
+    public ISelectionResult<TService> SelectProviders(ISelectionContext<TService> context)
+    {
+        if (context == null)
+            throw new ArgumentNullException(nameof(context));
+
+        if (context.Registrations.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No providers registered for service contract '{typeof(TService).Name}'.");
+        }
+
+        // Apply filtering to get all compatible providers
+        var compatibleProviders = FilterCompatibleProviders(context);
+
+        if (!compatibleProviders.Any())
+        {
+            throw new InvalidOperationException(
+                $"No compatible providers found for service contract '{typeof(TService).Name}' after applying filters.");
+        }
+
+        // Return all compatible providers for fan-out invocation
+        var selectedProviders = compatibleProviders
+            .Select(r => (TService)r.Provider)
+            .ToList();
+
+        var selectionMetadata = new Dictionary<string, object>
+        {
+            ["ProviderCount"] = selectedProviders.Count,
+            ["ProviderIds"] = compatibleProviders.Select(r => r.Capabilities.ProviderId).ToList(),
+            ["SelectionMethod"] = "FanOut (all compatible providers)",
+            ["StrategyType"] = "FanOut"
+        };
+
+        return new SelectionResult<TService>(
+            selectedProviders,
+            SelectionStrategyType.FanOut,
+            selectionMetadata);
+    }
+
+    /// <inheritdoc />
+    public bool CanHandle(ISelectionContext<TService> context)
+    {
+        // FanOut can handle any context with at least one registration
+        return context?.Registrations?.Count > 0;
+    }
+
+    /// <summary>
+    /// Filters providers to get only those compatible with the current platform and capabilities.
+    /// </summary>
+    private static IEnumerable<IProviderRegistration> FilterCompatibleProviders(ISelectionContext<TService> context)
+    {
+        var candidates = context.Registrations.AsEnumerable();
+
+        // Step 1: Apply capability filter (filter by tags if specified in metadata)
+        candidates = ApplyCapabilityFilter(candidates, context.Metadata);
+
+        // Step 2: Apply platform filter (ensure platform compatibility)
+        candidates = ApplyPlatformFilter(candidates);
+
+        // Step 3: Only return active providers
+        return candidates.Where(r => r.IsActive);
+    }
+
+    /// <summary>
+    /// Applies capability filtering based on required tags in selection metadata.
+    /// </summary>
+    private static IEnumerable<IProviderRegistration> ApplyCapabilityFilter(
+        IEnumerable<IProviderRegistration> candidates, 
+        IDictionary<string, object>? metadata)
+    {
+        if (metadata == null || !metadata.TryGetValue("RequiredTags", out var tagsObj))
+        {
+            return candidates; // No capability filter specified
+        }
+
+        var requiredTags = tagsObj switch
+        {
+            string[] stringArray => stringArray,
+            IEnumerable<string> enumerable => enumerable.ToArray(),
+            string singleTag => new[] { singleTag },
+            _ => Array.Empty<string>()
+        };
+
+        if (requiredTags.Length == 0)
+        {
+            return candidates;
+        }
+
+        return candidates.Where(r => r.Capabilities.HasTags(requiredTags));
+    }
+
+    /// <summary>
+    /// Applies platform compatibility filtering.
+    /// </summary>
+    private static IEnumerable<IProviderRegistration> ApplyPlatformFilter(IEnumerable<IProviderRegistration> candidates)
+    {
+        return candidates.Where(r => PlatformDetector.IsCompatible(r.Capabilities.Platform));
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            // FanOut doesn't maintain internal state that needs cleanup
+            // but we follow the pattern for consistency
+            _disposed = true;
+        }
+    }
+}
+
+/// <summary>
 /// Registry for default selection strategies provided by the runtime.
 /// </summary>
 public static class DefaultSelectionStrategies
@@ -232,5 +373,20 @@ public static class DefaultSelectionStrategies
         where TService : class
     {
         return new PickOneSelectionStrategy<TService>(registry, cacheTtl);
+    }
+
+    /// <summary>
+    /// Creates a default FanOut strategy for the specified service type.
+    /// </summary>
+    /// <typeparam name="TService">The service contract type.</typeparam>
+    /// <param name="registry">Optional service registry for provider change monitoring.</param>
+    /// <param name="resilienceExecutor">Optional resilience executor for fault handling.</param>
+    /// <returns>A FanOut selection strategy instance.</returns>
+    public static ISelectionStrategy<TService> CreateFanOut<TService>(
+        IServiceRegistry? registry = null,
+        IResilienceExecutor? resilienceExecutor = null)
+        where TService : class
+    {
+        return new FanOutSelectionStrategy<TService>(registry, resilienceExecutor);
     }
 }
