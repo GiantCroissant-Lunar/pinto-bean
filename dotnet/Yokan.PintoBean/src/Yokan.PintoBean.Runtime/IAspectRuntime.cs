@@ -1,0 +1,46 @@
+// Tier-3: Aspect runtime interface for cross-cutting concerns
+
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Yokan.PintoBean.Runtime;
+
+/// <summary>
+/// Cross-cutting adapter for aspect-oriented concerns including telemetry,
+/// logging, metrics collection, and other observability features.
+/// Provides hooks for method entry/exit and exception handling.
+/// </summary>
+public interface IAspectRuntime
+{
+    /// <summary>
+    /// Records the entry into a service method execution.
+    /// </summary>
+    /// <param name="serviceType">The service contract type.</param>
+    /// <param name="methodName">The name of the method being invoked.</param>
+    /// <param name="parameters">The parameters passed to the method.</param>
+    /// <returns>A correlation context for tracking this method execution.</returns>
+    IDisposable EnterMethod(Type serviceType, string methodName, object?[] parameters);
+
+    /// <summary>
+    /// Records a successful completion of a service method execution.
+    /// </summary>
+    /// <param name="context">The correlation context from EnterMethod.</param>
+    /// <param name="result">The result returned by the method.</param>
+    void ExitMethod(IDisposable context, object? result);
+
+    /// <summary>
+    /// Records an exception during service method execution.
+    /// </summary>
+    /// <param name="context">The correlation context from EnterMethod.</param>
+    /// <param name="exception">The exception that occurred.</param>
+    void RecordException(IDisposable context, Exception exception);
+
+    /// <summary>
+    /// Records custom metrics or telemetry data.
+    /// </summary>
+    /// <param name="name">The metric or event name.</param>
+    /// <param name="value">The metric value.</param>
+    /// <param name="tags">Optional tags for categorization.</param>
+    void RecordMetric(string name, double value, params (string Key, object Value)[] tags);
+}
