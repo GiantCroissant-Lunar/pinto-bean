@@ -50,6 +50,20 @@ jobs:
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
 
+      - name: Debug container environment
+        run: |
+          echo "=== Python version ==="
+          python --version
+          echo "=== PATH ==="
+          echo $PATH
+          echo "=== Installed packages ==="
+          pip list
+          echo "=== Local bin directory ==="
+          ls -la /root/.local/bin/ || echo "Directory does not exist"
+          echo "=== Pre-commit binary check ==="
+          which pre-commit || echo "pre-commit not found in PATH"
+          ls -la /root/.local/bin/pre-commit || echo "pre-commit binary does not exist"
+
       - name: Run pre-commit (changed files fast path)
         run: pre-commit run --show-diff-on-failure --color=always
 
