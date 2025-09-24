@@ -182,8 +182,14 @@ public class PintoBeanCodeGen : IIncrementalGenerator
         
         var argumentList = string.Join(", ", method.Parameters.Select(p => p.Name));
         
-        // Method signature
-        sb.AppendLine($"    public {returnType} {methodName}({parameterList})");
+        // Determine if method is async
+        bool isAsync = method.ReturnType.Name == "Task" || 
+                      (method.ReturnType is INamedTypeSymbol namedType && 
+                       namedType.IsGenericType && namedType.ConstructedFrom.Name == "Task");
+        
+        // Method signature - add async keyword if needed
+        var asyncModifier = isAsync ? "async " : "";
+        sb.AppendLine($"    public {asyncModifier}{returnType} {methodName}({parameterList})");
         sb.AppendLine("    {");
         
         // Create parameter array for aspect runtime
@@ -196,22 +202,16 @@ public class PintoBeanCodeGen : IIncrementalGenerator
         sb.AppendLine("        try");
         sb.AppendLine("        {");
         
-        // Determine if method is async
-        bool isAsync = method.ReturnType.Name == "Task" || 
-                      (method.ReturnType is INamedTypeSymbol namedType && 
-                       namedType.IsGenericType && namedType.ConstructedFrom.Name == "Task");
-        
         if (isAsync)
         {
             // Async method implementation
             if (method.ReturnType.Name == "Task" && method.ReturnType is INamedTypeSymbol taskType && !taskType.IsGenericType)
             {
                 // Task (no return value)
-                sb.AppendLine($"            var result = await _resilienceExecutor.ExecuteAsync(async ct => ");
+                sb.AppendLine($"            await _resilienceExecutor.ExecuteAsync(async ct => ");
                 sb.AppendLine($"                await _registry.For<{contractTypeName}>().InvokeAsync(async (service, ct) => ");
                 sb.AppendLine($"                    await service.{methodName}({argumentList}), ct), CancellationToken.None);");
                 sb.AppendLine("            _aspectRuntime.ExitMethod(context, null);");
-                sb.AppendLine("            return result;");
             }
             else
             {
@@ -229,7 +229,15 @@ public class PintoBeanCodeGen : IIncrementalGenerator
             if (method.ReturnType.SpecialType == SpecialType.System_Void)
             {
                 // void method
-                sb.AppendLine($"            _resilienceExecutor.Execute(() => _registry.For<{contractTypeName}>().Invoke(service => {{ service.{methodName}({argumentList}); return (object?)null; }} ));");
+                sb.AppendLine($"            _resilienceExecutor.Execute(() => ");
+                sb.AppendLine($"            {{");
+                sb.AppendLine($"                _registry.For<{contractTypeName}>().Invoke(service => ");
+                sb.AppendLine($"                {{");
+                sb.AppendLine($"                    service.{methodName}({argumentList});");
+                sb.AppendLine($"                    return (object?)null;");
+                sb.AppendLine($"                }});");
+                sb.AppendLine($"                return (object?)null;");
+                sb.AppendLine($"            }});");
                 sb.AppendLine("            _aspectRuntime.ExitMethod(context, null);");
             }
             else
