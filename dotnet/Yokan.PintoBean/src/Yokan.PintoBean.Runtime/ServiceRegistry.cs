@@ -184,9 +184,12 @@ internal sealed class TypedServiceRegistry<TService> : IServiceRegistry<TService
     /// <inheritdoc />
     public IServiceRegistry Registry { get; }
 
+    private readonly ISelectionStrategy<TService> _selectionStrategy;
+
     internal TypedServiceRegistry(IServiceRegistry registry)
     {
         Registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _selectionStrategy = DefaultSelectionStrategies.CreatePickOne<TService>();
     }
 
     /// <inheritdoc />
@@ -240,19 +243,11 @@ internal sealed class TypedServiceRegistry<TService> : IServiceRegistry<TService
     private TService SelectProvider()
     {
         var registrations = GetRegistrations().ToList();
-
-        if (registrations.Count == 0)
-        {
-            throw new InvalidOperationException(
-                $"No providers registered for service contract '{typeof(TService).Name}'.");
-        }
-
-        // Simple PickOne strategy: select highest priority, then by registration time (stable)
-        var selected = registrations
-            .OrderByDescending(r => (int)r.Capabilities.Priority)
-            .ThenBy(r => r.Capabilities.RegisteredAt)
-            .First();
-
-        return (TService)selected.Provider;
+        var context = new SelectionContext<TService>(registrations);
+        var result = _selectionStrategy.SelectProviders(context);
+        
+        // For backward compatibility, return the first selected provider
+        // This maintains the existing behavior for PickOne strategy
+        return result.SelectedProviders.First();
     }
 }
