@@ -52,7 +52,7 @@ jobs:
               id
             }
           }
-        }' -f login=${{ github.repository_owner }} --jq '.data.user.projectV2.id')
+        }' -f login=ApprenticeGC --jq '.data.user.projectV2.id')
 
         echo "Project ID: $PROJECT_ID"
 
@@ -184,7 +184,7 @@ jobs:
         echo "## Projects v2 Auto Management Results" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Action performed:** ${{ github.event.inputs.action || 'auto-add-issue' }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Project:** https://github.com/users/${{ github.repository_owner }}/projects/3" >> $GITHUB_STEP_SUMMARY
+        echo "**Project:** https://github.com/users/ApprenticeGC/projects/3" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
         echo "**Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
