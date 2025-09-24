@@ -62,6 +62,7 @@ using Yokan.PintoBean.CodeGen;
 
 namespace Yokan.PintoBean.Facades;
 
+[GenerateRegistry(typeof(ITestService))]
 public interface ITestService 
 {
     void DoSomething();
@@ -116,6 +117,7 @@ using Yokan.PintoBean.CodeGen;
 
 namespace Yokan.PintoBean.Facades;
 
+[GenerateRegistry(typeof(ITestService))]
 public interface ITestService 
 {
     void DoSomething();
@@ -159,7 +161,7 @@ public partial class TestService
 
         var expected = DiagnosticResult.CompilerError("SG0003")
             .WithSpan(12, 1, 12, 35)
-            .WithMessage("Contract 'Yokan.PintoBean.Facades.ITestService' is realized but missing GenerateRegistryAttribute. Add [GenerateRegistry(typeof(ITestService))] to enable typed registry generation.");
+            .WithMessage("Contract 'Yokan.PintoBean.Facades.ITestService' is realized but missing GenerateRegistryAttribute. Add [GenerateRegistry(typeof(Yokan.PintoBean.Facades.ITestService))] to enable typed registry generation.");
 
         await VerifyAnalyzerAsync(source, "TestFacades", expected);
     }
@@ -207,11 +209,13 @@ using Yokan.PintoBean.CodeGen;
 
 namespace Yokan.PintoBean.Facades;
 
+[GenerateRegistry(typeof(IUserService))]
 public interface IUserService 
 {
     void CreateUser();
 }
 
+[GenerateRegistry(typeof(IAccountService))]
 public interface IAccountService 
 {
     void CreateAccount();
@@ -239,11 +243,13 @@ using Yokan.PintoBean.CodeGen;
 
 namespace Yokan.PintoBean.Facades;
 
+[GenerateRegistry(typeof(IUserService))]
 public interface IUserService 
 {
     void CreateUser();
 }
 
+[GenerateRegistry(typeof(IOrderService))]
 public interface IOrderService 
 {
     void CreateOrder();
@@ -257,7 +263,7 @@ public partial class MixedService
 }";
 
         var expected = DiagnosticResult.CompilerWarning("SG0005")
-            .WithSpan(18, 30, 18, 42)
+            .WithSpan(20, 30, 20, 42)
             .WithMessage("Façade class realizes contracts from different categories: User Management, Commerce. Consider splitting into separate façades to encourage cohesion.");
 
         await VerifyAnalyzerAsync(source, "TestFacades", expected);

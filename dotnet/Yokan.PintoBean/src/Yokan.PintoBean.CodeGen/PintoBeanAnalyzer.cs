@@ -150,6 +150,13 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
 
         // SG0002: Check if RealizeService has zero contracts
         var contractTypes = GetContractTypesFromAttribute(realizeServiceAttribute);
+        
+        // Fallback to syntax-based parsing if semantic analysis failed
+        if (contractTypes.Length == 0)
+        {
+            contractTypes = GetContractTypesFromAttributeFallback(context, classDeclaration, classSymbol);
+        }
+        
         if (contractTypes.Length == 0)
         {
             var diagnostic = Diagnostic.Create(
@@ -273,7 +280,7 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
     {
         var contractTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
 
-        // Debug: Check if we have constructor arguments
+        // Check if we have constructor arguments
         if (attribute.ConstructorArguments.Length == 0)
         {
             return contractTypes.ToImmutable();
@@ -306,6 +313,37 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
                 if (argument.Kind == TypedConstantKind.Type && argument.Value is ITypeSymbol typeSymbol)
                 {
                     contractTypes.Add(typeSymbol);
+                }
+            }
+        }
+
+        return contractTypes.ToImmutable();
+    }
+
+    private static ImmutableArray<ITypeSymbol> GetContractTypesFromAttributeFallback(
+        SyntaxNodeAnalysisContext context,
+        ClassDeclarationSyntax classDeclaration,
+        INamedTypeSymbol classSymbol)
+    {
+        var contractTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
+
+        // Fallback: parse the attribute syntax directly when semantic analysis fails
+        var realizeServiceAttr = classDeclaration.AttributeLists
+            .SelectMany(list => list.Attributes)
+            .FirstOrDefault(attr => attr.Name.ToString().Contains("RealizeService"));
+
+        if (realizeServiceAttr?.ArgumentList?.Arguments != null)
+        {
+            foreach (var arg in realizeServiceAttr.ArgumentList.Arguments)
+            {
+                // Look for typeof(...) expressions
+                if (arg.Expression is TypeOfExpressionSyntax typeofExpr)
+                {
+                    var typeInfo = context.SemanticModel.GetTypeInfo(typeofExpr.Type);
+                    if (typeInfo.Type is ITypeSymbol typeSymbol)
+                    {
+                        contractTypes.Add(typeSymbol);
+                    }
                 }
             }
         }
