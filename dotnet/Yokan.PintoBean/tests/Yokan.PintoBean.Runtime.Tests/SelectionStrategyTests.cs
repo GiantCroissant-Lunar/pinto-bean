@@ -409,6 +409,69 @@ public class SelectionStrategyTests
         Assert.All(providerIds, id => Assert.StartsWith("test-provider-", id));
     }
 
+    [Fact]
+    public void FanOutSelectionStrategy_WithInactiveProviders_SkipsInactiveProviders()
+    {
+        // Arrange
+        var activeProvider = new TestSelectionService("Active");
+        var inactiveProvider = new TestSelectionService("Inactive");
+
+        var baseTime = DateTime.UtcNow;
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateActiveRegistration(activeProvider, Priority.Normal, baseTime, true),
+            CreateActiveRegistration(inactiveProvider, Priority.High, baseTime.AddSeconds(1), false)
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations);
+        var strategy = new FanOutSelectionStrategy<ITestSelectionService>();
+
+        // Act
+        var result = strategy.SelectProviders(context);
+
+        // Assert
+        Assert.Single(result.SelectedProviders);
+        Assert.Equal("Active", result.SelectedProviders.First().GetName());
+        Assert.Equal(SelectionStrategyType.FanOut, result.StrategyType);
+        Assert.NotNull(result.SelectionMetadata);
+        Assert.Equal(1, result.SelectionMetadata["ProviderCount"]);
+    }
+
+    [Fact]
+    public void FanOutSelectionStrategy_WithMixedTagRequirements_FiltersCorrectly()
+    {
+        // Arrange
+        var analyticsProvider = new TestSelectionService("Analytics");
+        var telemetryProvider = new TestSelectionService("Telemetry");
+        var bothProvider = new TestSelectionService("Both");
+        var neitherProvider = new TestSelectionService("Neither");
+
+        var baseTime = DateTime.UtcNow;
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistrationWithTags(analyticsProvider, Priority.Normal, baseTime, "analytics"),
+            CreateRegistrationWithTags(telemetryProvider, Priority.Normal, baseTime.AddSeconds(1), "telemetry"),
+            CreateRegistrationWithTags(bothProvider, Priority.Normal, baseTime.AddSeconds(2), "analytics", "telemetry"),
+            CreateRegistration(neitherProvider, Priority.Normal, baseTime.AddSeconds(3))
+        };
+
+        // Test with single tag requirement
+        var metadata = new Dictionary<string, object> { ["RequiredTags"] = new[] { "analytics" } };
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = new FanOutSelectionStrategy<ITestSelectionService>();
+
+        // Act
+        var result = strategy.SelectProviders(context);
+
+        // Assert
+        Assert.Equal(2, result.SelectedProviders.Count);
+        var providerNames = result.SelectedProviders.Select(p => p.GetName()).ToHashSet();
+        Assert.Contains("Analytics", providerNames);
+        Assert.Contains("Both", providerNames);
+        Assert.DoesNotContain("Telemetry", providerNames);
+        Assert.DoesNotContain("Neither", providerNames);
+    }
+
     private static IProviderRegistration CreateRegistration(
         ITestSelectionService provider, 
         Priority priority, 
@@ -451,6 +514,29 @@ public class SelectionStrategyTests
             Provider = provider,
             Capabilities = capabilities,
             IsActive = true
+        };
+    }
+
+    private static IProviderRegistration CreateActiveRegistration(
+        ITestSelectionService provider, 
+        Priority priority, 
+        DateTime registeredAt,
+        bool isActive)
+    {
+        var capabilities = new ProviderCapabilities
+        {
+            ProviderId = $"test-provider-{Guid.NewGuid()}",
+            Priority = priority,
+            RegisteredAt = registeredAt,
+            Platform = Platform.Any
+        };
+
+        return new TestProviderRegistration
+        {
+            ServiceType = typeof(ITestSelectionService),
+            Provider = provider,
+            Capabilities = capabilities,
+            IsActive = isActive
         };
     }
 
