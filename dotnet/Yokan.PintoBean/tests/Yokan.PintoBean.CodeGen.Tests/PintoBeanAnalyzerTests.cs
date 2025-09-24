@@ -324,6 +324,7 @@ public partial class MixedService
             {
 #pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location), // System.Private.CoreLib
+                MetadataReference.CreateFromFile(typeof(System.Attribute).Assembly.Location), // System.Runtime
 #pragma warning restore IL3000
             };
             

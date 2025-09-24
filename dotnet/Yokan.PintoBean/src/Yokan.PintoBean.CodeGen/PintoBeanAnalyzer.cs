@@ -273,17 +273,20 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
     {
         var contractTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
 
-        // The params Type[] constructor can be represented in two ways:
-        // 1. Single argument when one type is passed: [RealizeService(typeof(IService))]
-        // 2. Array argument when multiple types are passed: [RealizeService(typeof(IService1), typeof(IService2))]
-        
+        // Debug: Check if we have constructor arguments
         if (attribute.ConstructorArguments.Length == 0)
         {
             return contractTypes.ToImmutable();
         }
 
-        // Check if the first argument is an array (multiple types)
+        // The RealizeServiceAttribute constructor takes params Type[] contracts
+        // In Roslyn, this can appear as:
+        // 1. A single TypedConstant of Kind.Array when multiple types: [RealizeService(typeof(A), typeof(B))]
+        // 2. Individual TypedConstant arguments when expanded: could be individual Type arguments
+        
         var firstArgument = attribute.ConstructorArguments[0];
+        
+        // Case 1: Single array argument (multiple types passed to params)
         if (firstArgument.Kind == TypedConstantKind.Array)
         {
             foreach (var element in firstArgument.Values)
@@ -296,7 +299,8 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
         }
         else
         {
-            // Single arguments or multiple individual arguments (params expansion)
+            // Case 2: Individual arguments or single type argument
+            // For params Type[], even a single typeof(T) might be passed as individual arguments
             foreach (var argument in attribute.ConstructorArguments)
             {
                 if (argument.Kind == TypedConstantKind.Type && argument.Value is ITypeSymbol typeSymbol)
