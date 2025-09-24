@@ -194,6 +194,321 @@ public class SelectionStrategyTests
         Assert.Equal(typeof(ITestSelectionService), ((ISelectionStrategy)strategy).ServiceType);
     }
 
+    [Fact]
+    public void ShardedSelectionStrategy_WithAnalyticsEventName_ExtractsCorrectShardKey()
+    {
+        // Arrange
+        var firstProvider = new TestSelectionService("FirstProvider");
+        var secondProvider = new TestSelectionService("SecondProvider");
+
+        var baseTime = DateTime.UtcNow;
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistration(firstProvider, Priority.Normal, baseTime.AddSeconds(1)),
+            CreateRegistration(secondProvider, Priority.Normal, baseTime.AddSeconds(2))
+        };
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "player.level.complete"
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
+
+        // Act
+        var result = strategy.SelectProviders(context);
+
+        // Assert
+        Assert.Single(result.SelectedProviders);
+        Assert.Equal(SelectionStrategyType.Sharded, result.StrategyType);
+        Assert.NotNull(result.SelectionMetadata);
+        Assert.Equal("player", result.SelectionMetadata!["ShardKey"]);
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_WithExplicitShardKey_UsesShardKeyDirectly()
+    {
+        // Arrange
+        var provider = new TestSelectionService("TestProvider");
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistration(provider, Priority.Normal, DateTime.UtcNow)
+        };
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["ShardKey"] = "custom-shard"
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
+
+        // Act
+        var result = strategy.SelectProviders(context);
+
+        // Assert
+        Assert.Single(result.SelectedProviders);
+        Assert.Equal(SelectionStrategyType.Sharded, result.StrategyType);
+        Assert.Equal("custom-shard", result.SelectionMetadata!["ShardKey"]);
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_WithConsistentHashing_SelectsSameProviderForSameKey()
+    {
+        // Arrange
+        var firstProvider = new TestSelectionService("Provider1");
+        var secondProvider = new TestSelectionService("Provider2");
+        var thirdProvider = new TestSelectionService("Provider3");
+
+        var baseTime = DateTime.UtcNow;
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistration(firstProvider, Priority.Normal, baseTime.AddSeconds(1)),
+            CreateRegistration(secondProvider, Priority.Normal, baseTime.AddSeconds(2)),
+            CreateRegistration(thirdProvider, Priority.Normal, baseTime.AddSeconds(3))
+        };
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "player.death.pvp"
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
+
+        // Act - Run multiple times to verify consistent selection
+        var results = new List<string>();
+        for (int i = 0; i < 5; i++)
+        {
+            var result = strategy.SelectProviders(context);
+            results.Add(result.SelectedProviders.First().GetName());
+        }
+
+        // Assert
+        Assert.True(results.All(r => r == results[0]), "Sharded selection should be consistent for the same shard key");
+        // Verify that the shard key was correctly extracted
+        var firstResult = strategy.SelectProviders(context);
+        Assert.Equal("player", firstResult.SelectionMetadata!["ShardKey"]);
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_WithDifferentShardKeys_CanSelectDifferentProviders()
+    {
+        // Arrange
+        var firstProvider = new TestSelectionService("Provider1");
+        var secondProvider = new TestSelectionService("Provider2");
+
+        var baseTime = DateTime.UtcNow;
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistration(firstProvider, Priority.Normal, baseTime.AddSeconds(1)),
+            CreateRegistration(secondProvider, Priority.Normal, baseTime.AddSeconds(2))
+        };
+
+        var context1 = new SelectionContext<ITestSelectionService>(
+            registrations, 
+            new Dictionary<string, object> { ["EventName"] = "player.level.complete" });
+        
+        var context2 = new SelectionContext<ITestSelectionService>(
+            registrations, 
+            new Dictionary<string, object> { ["EventName"] = "game.session.start" });
+
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
+
+        // Act
+        var result1 = strategy.SelectProviders(context1);
+        var result2 = strategy.SelectProviders(context2);
+
+        // Assert
+        Assert.Single(result1.SelectedProviders);
+        Assert.Single(result2.SelectedProviders);
+        Assert.Equal("player", result1.SelectionMetadata!["ShardKey"]);
+        Assert.Equal("game", result2.SelectionMetadata!["ShardKey"]);
+        
+        // Different shard keys may select different providers (this is probabilistic)
+        // but each should be consistent
+        Assert.Equal(SelectionStrategyType.Sharded, result1.StrategyType);
+        Assert.Equal(SelectionStrategyType.Sharded, result2.StrategyType);
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_WithCustomKeyExtractor_UsesCustomLogic()
+    {
+        // Arrange
+        var provider = new TestSelectionService("TestProvider");
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistration(provider, Priority.Normal, DateTime.UtcNow)
+        };
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["CustomField"] = "custom-value-123"
+        };
+
+        // Custom key extractor that extracts the numeric suffix
+        var customKeyExtractor = new Func<IDictionary<string, object>?, string>(meta =>
+        {
+            if (meta?.TryGetValue("CustomField", out var value) == true && value is string str)
+            {
+                var parts = str.Split('-');
+                return parts.Length > 2 ? parts[2] : "default";
+            }
+            return "default";
+        });
+
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = DefaultSelectionStrategies.CreateSharded<ITestSelectionService>(customKeyExtractor);
+
+        // Act
+        var result = strategy.SelectProviders(context);
+
+        // Assert
+        Assert.Single(result.SelectedProviders);
+        Assert.Equal(SelectionStrategyType.Sharded, result.StrategyType);
+        Assert.Equal("123", result.SelectionMetadata!["ShardKey"]);
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_WithNoMetadata_ThrowsException()
+    {
+        // Arrange
+        var provider = new TestSelectionService("TestProvider");
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistration(provider, Priority.Normal, DateTime.UtcNow)
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations);
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => strategy.SelectProviders(context));
+        Assert.Contains("requires metadata with EventName or ShardKey", exception.Message);
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_CanHandle_ReturnsTrueForValidContext()
+    {
+        // Arrange
+        var provider = new TestSelectionService("TestProvider");
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistration(provider, Priority.Normal, DateTime.UtcNow)
+        };
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "player.level.complete"
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
+
+        // Act
+        var canHandle = strategy.CanHandle(context);
+
+        // Assert
+        Assert.True(canHandle);
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_CanHandle_ReturnsFalseForInvalidContext()
+    {
+        // Arrange
+        var provider = new TestSelectionService("TestProvider");
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistration(provider, Priority.Normal, DateTime.UtcNow)
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations); // No metadata
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
+
+        // Act
+        var canHandle = strategy.CanHandle(context);
+
+        // Assert
+        Assert.False(canHandle);
+    }
+
+    [Fact]
+    public void ExtractAnalyticsShardKey_WithEventName_ExtractsPrefix()
+    {
+        // Arrange
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "player.level.complete"
+        };
+
+        // Act
+        var shardKey = DefaultSelectionStrategies.ExtractAnalyticsShardKey(metadata);
+
+        // Assert
+        Assert.Equal("player", shardKey);
+    }
+
+    [Fact]
+    public void ExtractAnalyticsShardKey_WithEventNameNoDot_ReturnsFullName()
+    {
+        // Arrange
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "login"
+        };
+
+        // Act
+        var shardKey = DefaultSelectionStrategies.ExtractAnalyticsShardKey(metadata);
+
+        // Assert
+        Assert.Equal("login", shardKey);
+    }
+
+    [Fact]
+    public void ExtractAnalyticsShardKey_WithExplicitShardKey_PrefersSharKey()
+    {
+        // Arrange
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "player.level.complete",
+            ["ShardKey"] = "custom-shard"
+        };
+
+        // Act
+        var shardKey = DefaultSelectionStrategies.ExtractAnalyticsShardKey(metadata);
+
+        // Assert
+        Assert.Equal("custom-shard", shardKey);
+    }
+
+    [Fact]
+    public void ExtractAnalyticsShardKey_WithNoValidData_ThrowsException()
+    {
+        // Arrange
+        var metadata = new Dictionary<string, object>
+        {
+            ["SomeOtherField"] = "value"
+        };
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => 
+            DefaultSelectionStrategies.ExtractAnalyticsShardKey(metadata));
+        Assert.Contains("requires metadata with EventName or ShardKey", exception.Message);
+    }
+
+    [Fact]
+    public void DefaultSelectionStrategies_CreateAnalyticsSharded_ReturnsShardedStrategy()
+    {
+        // Act
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
+
+        // Assert
+        Assert.NotNull(strategy);
+        Assert.Equal(SelectionStrategyType.Sharded, strategy.StrategyType);
+        Assert.Equal(typeof(ITestSelectionService), ((ISelectionStrategy)strategy).ServiceType);
+    }
+
     private static IProviderRegistration CreateRegistration(
         ITestSelectionService provider, 
         Priority priority, 
