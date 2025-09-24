@@ -56,10 +56,16 @@ jobs:
           python --version
           echo "=== PATH ==="
           echo $PATH
-          echo "=== Installed packages ==="
+          echo "=== Python path ==="
+          python -c "import sys; print('\n'.join(sys.path))"
+          echo "=== Installed packages (system) ==="
           pip list
-          echo "=== Local bin directory ==="
-          ls -la /root/.local/bin/ || echo "Directory does not exist"
+          echo "=== Installed packages (user) ==="
+          pip list --user || echo "No user packages found"
+          echo "=== Local lib directory ==="
+          ls -la /root/.local/lib/python3.11/site-packages/ | head -10 || echo "Directory does not exist"
+          echo "=== Pre-commit module check ==="
+          python -c "import pre_commit; print(pre_commit.__version__)" || echo "Cannot import pre_commit module"
           echo "=== Pre-commit binary check ==="
           which pre-commit || echo "pre-commit not found in PATH"
           ls -la /root/.local/bin/pre-commit || echo "pre-commit binary does not exist"
