@@ -28,5 +28,8 @@
     <!-- Code Analysis packages -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.5.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" />
+
+    <!-- Benchmarking packages -->
+    <PackageVersion Include="BenchmarkDotNet" Version="0.13.12" />
   </ItemGroup>
 </Project>

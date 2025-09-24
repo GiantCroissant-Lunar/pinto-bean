@@ -22,6 +22,9 @@ dist/
 # Build and cache directories
 .cache/
 
+# BenchmarkDotNet artifacts
+**/BenchmarkDotNet.Artifacts/
+
 # Log4brains generated files
 .log4brains/
 
