@@ -23,7 +23,7 @@ jobs:
     name: Run pre-commit hooks (Docker)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}/precommit:latest
+      image: ghcr.io/giantcroissant-lunar/pinto-bean/precommit:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
