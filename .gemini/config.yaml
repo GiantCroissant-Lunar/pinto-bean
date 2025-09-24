@@ -1,3 +1,4 @@
+---
 have_fun: false
 code_review:
   disable: false
@@ -12,11 +13,11 @@ ignore_patterns:
   - "**/.mypy_cache/**"
   - "**/.ruff_cache/**"
   - "**/.pytest_cache/**"
-  - "**/Library/**"          # Unity generated
-  - "**/Temp/**"             # Unity generated
-  - "**/Obj/**"              # Unity build/temp
-  - "**/Build/**"            # Unity build output
+  - "**/Library/**"           # Unity generated
+  - "**/Temp/**"              # Unity generated
+  - "**/Obj/**"               # Unity build/temp
+  - "**/Build/**"             # Unity build output
   - "**/infra/terraform/**/.terraform/**"
-  - "**/*.lock"              # Skip generic lockfiles (NuGet, etc.)
+  - "**/*.lock"               # Skip generic lockfiles (NuGet, etc.)
   - "**/*.bin"
-  - "**/scripts/python/tools/hooks/**" # Small local hook scripts (already tested)
+  - "**/scripts/python/tools/hooks/**"  # Small local hook scripts (already tested)
