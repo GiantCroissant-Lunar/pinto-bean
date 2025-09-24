@@ -20,30 +20,41 @@ if (!File.Exists(terminalLibPath))
 		terminalLibPath = candidate;
 	}
 }
+// Runtime-loaded plugin path via env var or fallback to Dungeon plugin
+var envPlugin = Environment.GetEnvironmentVariable("CONSOLEGAME_PLUGIN_PATH");
+var dungeonPath = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "ConsoleGame.Dungeon.Plugin", "bin", new DirectoryInfo(baseDir).Parent?.Name ?? "Debug", new DirectoryInfo(baseDir).Name, "ConsoleGame.Dungeon.Plugin.dll"));
+string pluginPath;
+if (!string.IsNullOrWhiteSpace(envPlugin) && File.Exists(envPlugin))
+{
+	pluginPath = envPlugin;
+	Console.WriteLine($"Using plugin from env: {pluginPath}");
+}
+else
+{
+	pluginPath = File.Exists(dungeonPath) ? dungeonPath : terminalLibPath;
+}
+
+using var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (s, e) => { e.Cancel = true; cts.Cancel(); };
+
 try
 {
-	if (File.Exists(terminalLibPath))
+	if (File.Exists(pluginPath))
 	{
-		var pluginMsg = SelfLoader.LoadTerminalLibAndGetInfo(terminalLibPath);
-		Console.WriteLine(pluginMsg);
-
-		// Also load via IPlugin contract
-		try
-		{
-			IPlugin plugin = SelfLoader.LoadPlugin(terminalLibPath);
-			Console.WriteLine($"IPlugin: {plugin.Name} => {plugin.Describe()}");
-		}
-		catch (Exception ex)
-		{
-			Console.WriteLine($"IPlugin load failed: {ex.GetType().Name}: {ex.Message}");
-		}
+		await SelfLoader.RunPluginAsync(pluginPath, services: new DefaultServices(), shutdownToken: cts.Token);
 	}
 	else
 	{
-		Console.WriteLine($"Plugin not found at {terminalLibPath}. Build the solution so the dll is copied alongside the app.");
+		Console.WriteLine($"No plugin found. Checked: {pluginPath}");
 	}
 }
 catch (Exception ex)
 {
-	Console.WriteLine($"Plugin load failed: {ex.GetType().Name}: {ex.Message}");
+	Console.WriteLine($"Runtime plugin error: {ex.GetType().Name}: {ex.Message}");
+}
+
+// dummy services for sample
+public sealed class DefaultServices : IServiceProvider
+{
+	public object? GetService(Type serviceType) => null;
 }
