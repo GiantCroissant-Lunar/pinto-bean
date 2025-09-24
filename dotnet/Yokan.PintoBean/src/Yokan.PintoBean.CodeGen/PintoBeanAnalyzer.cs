@@ -147,8 +147,12 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
     private static AttributeData? GetRealizeServiceAttribute(INamedTypeSymbol classSymbol)
     {
         return classSymbol.GetAttributes()
-            .FirstOrDefault(attr => attr.AttributeClass?.Name == "RealizeServiceAttribute" &&
-                                   attr.AttributeClass.ContainingNamespace?.ToDisplayString() == "Yokan.PintoBean.CodeGen");
+            .FirstOrDefault(attr => 
+            {
+                var attributeClass = attr.AttributeClass;
+                return attributeClass?.Name == "RealizeServiceAttribute" &&
+                       attributeClass.ContainingNamespace?.ToDisplayString() == "Yokan.PintoBean.CodeGen";
+            });
     }
 
     private static void AnalyzeRealizeServiceUsage(
@@ -278,22 +282,36 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
     {
         var contractTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
 
-        if (attribute.ConstructorArguments.Length > 0)
+        // The params Type[] constructor can be represented in two ways:
+        // 1. Single argument when one type is passed: [RealizeService(typeof(IService))]
+        // 2. Array argument when multiple types are passed: [RealizeService(typeof(IService1), typeof(IService2))]
+        
+        if (attribute.ConstructorArguments.Length == 0)
         {
-            var contractsArgument = attribute.ConstructorArguments[0];
-            if (contractsArgument.Kind == TypedConstantKind.Array)
+            return contractTypes.ToImmutable();
+        }
+
+        // Check if the first argument is an array (multiple types)
+        var firstArgument = attribute.ConstructorArguments[0];
+        if (firstArgument.Kind == TypedConstantKind.Array)
+        {
+            foreach (var element in firstArgument.Values)
             {
-                foreach (var element in contractsArgument.Values)
+                if (element.Kind == TypedConstantKind.Type && element.Value is ITypeSymbol typeSymbol)
                 {
-                    if (element.Kind == TypedConstantKind.Type && element.Value is ITypeSymbol typeSymbol)
-                    {
-                        contractTypes.Add(typeSymbol);
-                    }
+                    contractTypes.Add(typeSymbol);
                 }
             }
-            else if (contractsArgument.Kind == TypedConstantKind.Type && contractsArgument.Value is ITypeSymbol singleType)
+        }
+        else
+        {
+            // Single arguments or multiple individual arguments (params expansion)
+            foreach (var argument in attribute.ConstructorArguments)
             {
-                contractTypes.Add(singleType);
+                if (argument.Kind == TypedConstantKind.Type && argument.Value is ITypeSymbol typeSymbol)
+                {
+                    contractTypes.Add(typeSymbol);
+                }
             }
         }
 

@@ -311,20 +311,49 @@ public partial class MixedService
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source);
             
-            var references = new[]
+            // Use the basic references from .NET Standard
+            var references = new List<MetadataReference>
             {
 #pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(System.Attribute).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(RealizeServiceAttribute).Assembly.Location)
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location), // System.Private.CoreLib
+                MetadataReference.CreateFromFile(typeof(RealizeServiceAttribute).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(GenerateRegistryAttribute).Assembly.Location)
 #pragma warning restore IL3000
             };
+            
+            // Add System.Runtime reference for netstandard compatibility
+            try 
+            {
+#pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
+                var systemRuntime = System.Reflection.Assembly.Load("System.Runtime");
+                references.Add(MetadataReference.CreateFromFile(systemRuntime.Location));
+#pragma warning restore IL3000
+            }
+            catch 
+            {
+                // Fallback - try to find it by type reference
+#pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
+                var typeType = typeof(System.Type);
+                references.Add(MetadataReference.CreateFromFile(typeType.Assembly.Location));
+#pragma warning restore IL3000
+            }
 
-            return CSharpCompilation.Create(
+            var compilation = CSharpCompilation.Create(
                 assemblyName,
                 new[] { syntaxTree },
                 references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                
+            // Check for compilation errors - only check critical errors, ignore warnings
+            var compilationDiagnostics = compilation.GetDiagnostics();
+            var errors = compilationDiagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+            if (errors.Any())
+            {
+                var errorMessages = string.Join("\n", errors.Select(e => e.ToString()));
+                throw new InvalidOperationException($"Compilation failed with errors:\n{errorMessages}");
+            }
+
+            return compilation;
         }
 
         private static void VerifyDiagnostics(ImmutableArray<Diagnostic> actualDiagnostics, DiagnosticResult[] expectedResults)
