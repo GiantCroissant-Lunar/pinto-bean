@@ -168,6 +168,10 @@ def scan_git_index() -> None:
         p = REPO_ROOT / rel
         if not p.is_file():
             continue
+        # Skip NUKE bootstrap/build scripts which can contain high-entropy tokens or placeholders
+        # that are not secrets (e.g., generated identifiers or tool settings)
+        if rel.startswith("build/nuke/"):
+            continue
         if p.name.endswith(ALLOWED_JSON_SUFFIX):
             # Skip known config where age public key appears
             if rel.endswith(".sops.yaml"):
