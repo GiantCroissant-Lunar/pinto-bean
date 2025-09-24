@@ -1,8 +1,11 @@
 // Tier-3: Dependency injection extensions for service registry
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Yokan.PintoBean.Runtime;
@@ -101,6 +104,94 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<ISelectionStrategyFactory, DefaultSelectionStrategyFactory>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Adds selection strategies to the service collection using the IOptions pattern.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection AddSelectionStrategies(this IServiceCollection services)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        // Ensure service registry is registered
+        services.AddServiceRegistry();
+
+        // Check if SelectionStrategyOptions is already registered
+        var existingDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(SelectionStrategyOptions));
+        if (existingDescriptor != null)
+        {
+            // If already registered, ensure IOptions pattern is also available
+            services.TryAddSingleton<IOptions<SelectionStrategyOptions>>(serviceProvider =>
+            {
+                var existingOptions = serviceProvider.GetRequiredService<SelectionStrategyOptions>();
+                return Options.Create(existingOptions);
+            });
+        }
+        else
+        {
+            // Configure using IOptions pattern
+            services.AddOptions<SelectionStrategyOptions>();
+
+            // Register the options as a singleton for backwards compatibility
+            services.TryAddSingleton<SelectionStrategyOptions>(serviceProvider =>
+                serviceProvider.GetRequiredService<IOptions<SelectionStrategyOptions>>().Value);
+        }
+
+        // Register default strategy factory
+        services.TryAddSingleton<ISelectionStrategyFactory, DefaultSelectionStrategyFactory>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds selection strategies to the service collection using the IOptions pattern with configuration binding.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="configuration">The configuration section to bind to SelectionStrategyOptions.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> or <paramref name="configuration"/> is null.</exception>
+    [UnconditionalSuppressMessage("AOT", "IL3050:Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.", Justification = "Configuration binding is expected to work with SelectionStrategyOptions properties.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code.", Justification = "Configuration binding is expected to work with SelectionStrategyOptions properties.")]
+    public static IServiceCollection AddSelectionStrategies(this IServiceCollection services, IConfiguration configuration)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+
+        // Ensure service registry is registered
+        services.AddServiceRegistry();
+
+        // Configure using IOptions pattern with configuration binding
+        services.AddOptions<SelectionStrategyOptions>()
+            .Bind(configuration);
+
+        // Register the options as a singleton for backwards compatibility
+        services.TryAddSingleton<SelectionStrategyOptions>(serviceProvider =>
+            serviceProvider.GetRequiredService<IOptions<SelectionStrategyOptions>>().Value);
+
+        // Register default strategy factory
+        services.TryAddSingleton<ISelectionStrategyFactory, DefaultSelectionStrategyFactory>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds selection strategies to the service collection using the IOptions pattern with configuration section name.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="configuration">The configuration instance.</param>
+    /// <param name="sectionName">The name of the configuration section to bind.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/>, <paramref name="configuration"/>, or <paramref name="sectionName"/> is null.</exception>
+    public static IServiceCollection AddSelectionStrategies(this IServiceCollection services, IConfiguration configuration, string sectionName)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+        if (sectionName == null) throw new ArgumentNullException(nameof(sectionName));
+
+        return services.AddSelectionStrategies(configuration.GetSection(sectionName));
     }
 
     /// <summary>
