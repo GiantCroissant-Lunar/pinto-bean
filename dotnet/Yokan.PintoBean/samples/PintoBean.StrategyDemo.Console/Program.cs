@@ -49,6 +49,9 @@ public class Program
         System.Console.WriteLine("\n🔧 Demonstrating Strategy Configuration:");
         DemonstrateStrategyConfiguration(host.Services);
 
+        System.Console.WriteLine("\n🚀 Demonstrating FanOut Error Policies:");
+        DemonstrateFanOutErrorPolicies();
+
         System.Console.WriteLine("\n✅ Demo completed successfully!");
     }
 
@@ -88,6 +91,109 @@ public class Program
             System.Console.WriteLine($"  {serviceType.Name}: {strategy}");
         }
     }
+
+    private static void DemonstrateFanOutErrorPolicies()
+    {
+        System.Console.WriteLine("Creating demo providers with mixed success/failure behavior...");
+        
+        // Create some demo analytics providers - some will succeed, some will fail
+        var providers = new IAnalyticsService[]
+        {
+            new ConsoleAnalyticsService("Provider1", shouldFail: false),
+            new ConsoleAnalyticsService("Provider2", shouldFail: true, failureMessage: "Network timeout"),
+            new ConsoleAnalyticsService("Provider3", shouldFail: false),
+            new ConsoleAnalyticsService("Provider4", shouldFail: true, failureMessage: "Rate limit exceeded")
+        };
+
+        System.Console.WriteLine($"Created {providers.Length} providers (2 succeed, 2 fail)\n");
+
+        // Demonstrate Continue policy (default)
+        System.Console.WriteLine("🔄 Testing Continue Policy (default):");
+        var continueOptions = FanOutAggregationOptions<string>.WithErrorPolicy(FanOutErrorPolicy.Continue);
+        
+        try
+        {
+            var continueResult = FanOutAggregator.Aggregate(
+                providers,
+                provider => ((IAnalyticsService)provider).ProcessEvent("user.login", new { userId = 123 }),
+                continueOptions);
+            
+            System.Console.WriteLine($"   ✅ Continue policy result: {continueResult}");
+        }
+        catch (AggregateException ex)
+        {
+            System.Console.WriteLine($"   ⚠️  Continue policy collected {ex.InnerExceptions.Count} failures but returned successful results");
+        }
+
+        // Demonstrate FailFast policy
+        System.Console.WriteLine("\n⚡ Testing FailFast Policy:");
+        var failFastOptions = FanOutAggregationOptions<string>.WithErrorPolicy(FanOutErrorPolicy.FailFast);
+        
+        try
+        {
+            var failFastResult = FanOutAggregator.Aggregate(
+                providers,
+                provider => ((IAnalyticsService)provider).ProcessEvent("user.login", new { userId = 123 }),
+                failFastOptions);
+            
+            System.Console.WriteLine($"   ✅ FailFast policy result: {failFastResult}");
+        }
+        catch (AggregateException ex)
+        {
+            System.Console.WriteLine($"   ❌ FailFast policy failed immediately: {ex.InnerExceptions.First().Message}");
+        }
+
+        // Demonstrate custom reduce function
+        System.Console.WriteLine("\n🔗 Testing Custom Reduce Function:");
+        var customOptions = FanOutAggregationOptions<string>.Create(
+            FanOutErrorPolicy.Continue,
+            results => $"Combined: [{string.Join(", ", results)}]");
+        
+        try
+        {
+            var customResult = FanOutAggregator.Aggregate(
+                providers.Where(p => !((ConsoleAnalyticsService)p).ShouldFail), // Only successful providers
+                provider => ((IAnalyticsService)provider).ProcessEvent("user.login", new { userId = 123 }),
+                customOptions);
+            
+            System.Console.WriteLine($"   ✅ Custom reduce result: {customResult}");
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"   ❌ Custom reduce failed: {ex.Message}");
+        }
+
+        // Demonstrate void operations (fire-and-forget)
+        System.Console.WriteLine("\n🔥 Testing Fire-and-Forget Operations:");
+        
+        System.Console.WriteLine("   Continue policy (void operations):");
+        try
+        {
+            FanOutAggregator.ExecuteAll(
+                providers,
+                provider => ((IAnalyticsService)provider).TrackEvent("app.started", new { version = "1.0" }),
+                FanOutErrorPolicy.Continue);
+            System.Console.WriteLine("   ✅ Continue policy completed (some may have failed silently)");
+        }
+        catch (AggregateException ex)
+        {
+            System.Console.WriteLine($"   ⚠️  Continue policy completed with {ex.InnerExceptions.Count} failures");
+        }
+
+        System.Console.WriteLine("   FailFast policy (void operations):");
+        try
+        {
+            FanOutAggregator.ExecuteAll(
+                providers,
+                provider => ((IAnalyticsService)provider).TrackEvent("app.started", new { version = "1.0" }),
+                FanOutErrorPolicy.FailFast);
+            System.Console.WriteLine("   ✅ FailFast policy completed successfully");
+        }
+        catch (AggregateException ex)
+        {
+            System.Console.WriteLine($"   ❌ FailFast policy failed immediately: {ex.InnerExceptions.First().Message}");
+        }
+    }
 }
 
 // Demo service interfaces and implementations
@@ -95,13 +201,38 @@ public class Program
 public interface IAnalyticsService
 {
     void TrackEvent(string eventName, object data);
+    string ProcessEvent(string eventName, object data);
 }
 
 public class ConsoleAnalyticsService : IAnalyticsService
 {
+    public string Name { get; }
+    public bool ShouldFail { get; }
+    public string FailureMessage { get; }
+
+    public ConsoleAnalyticsService(string name = "Console", bool shouldFail = false, string failureMessage = "Operation failed")
+    {
+        Name = name;
+        ShouldFail = shouldFail;
+        FailureMessage = failureMessage;
+    }
+
     public void TrackEvent(string eventName, object data)
     {
-        System.Console.WriteLine($"[Analytics] {eventName}: {data}");
+        if (ShouldFail)
+            throw new InvalidOperationException($"[{Name}] {FailureMessage}");
+        
+        System.Console.WriteLine($"[{Name} Analytics] {eventName}: {data}");
+    }
+
+    public string ProcessEvent(string eventName, object data)
+    {
+        if (ShouldFail)
+            throw new InvalidOperationException($"[{Name}] {FailureMessage}");
+        
+        var result = $"Processed {eventName} with {Name}";
+        System.Console.WriteLine($"[{Name} Analytics] {result}");
+        return result;
     }
 }
 
