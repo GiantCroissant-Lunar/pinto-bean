@@ -47,7 +47,7 @@ public sealed class SelectionCache<TService> : IProviderSelectionCache<TService>
     public SelectionCache(TimeSpan? defaultTtl = null)
     {
         _defaultTtl = defaultTtl ?? TimeSpan.FromMinutes(5); // Default 5-minute TTL
-        
+
         // Create timer for periodic cleanup (every 30 seconds)
         _evictionTimer = new Timer(CleanupExpiredCallback, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
@@ -63,14 +63,14 @@ public sealed class SelectionCache<TService> : IProviderSelectionCache<TService>
     {
         ThrowIfDisposed();
         var key = GenerateCacheKey(context);
-        
+
         if (_cache.TryGetValue(key, out var entry))
         {
             if (!entry.IsExpired)
             {
                 return entry.Result;
             }
-            
+
             // Remove expired entry
             _cache.TryRemove(key, out _);
         }
@@ -132,7 +132,7 @@ public sealed class SelectionCache<TService> : IProviderSelectionCache<TService>
             return;
 
         var keysToRemove = new List<string>();
-        
+
         foreach (var kvp in _cache)
         {
             if (kvp.Value.IsExpired)
@@ -209,7 +209,7 @@ public sealed class SelectionCache<TService> : IProviderSelectionCache<TService>
         var keyString = keyBuilder.ToString();
         var keyBytes = Encoding.UTF8.GetBytes(keyString);
         var hashBytes = SHA256.HashData(keyBytes);
-        
+
         return Convert.ToHexString(hashBytes);
     }
 }
@@ -232,35 +232,35 @@ public static class SelectionContextHashHelper
             throw new ArgumentNullException(nameof(context));
 
         var hash = new HashCode();
-        
+
         // Add service type
         hash.Add(typeof(TService));
-        
+
         // Add sorted provider IDs for deterministic hash
         var providerIds = context.Registrations
             .Select(r => r.Capabilities.ProviderId)
             .OrderBy(id => id, StringComparer.Ordinal)
             .ToList();
-        
+
         foreach (var providerId in providerIds)
         {
             hash.Add(providerId);
         }
-        
+
         // Add sorted metadata keys and values
         if (context.Metadata != null && context.Metadata.Count > 0)
         {
             var sortedMetadata = context.Metadata
                 .OrderBy(kvp => kvp.Key, StringComparer.Ordinal)
                 .ToList();
-                
+
             foreach (var kvp in sortedMetadata)
             {
                 hash.Add(kvp.Key);
                 hash.Add(kvp.Value);
             }
         }
-        
+
         return hash.ToHashCode();
     }
 
@@ -276,44 +276,44 @@ public static class SelectionContextHashHelper
     {
         if (ReferenceEquals(left, right))
             return true;
-            
+
         if (left == null || right == null)
             return false;
-            
+
         // Check service type
         if (left.ServiceType != right.ServiceType)
             return false;
-            
+
         // Check provider registrations (order-independent)
         var leftProviderIds = left.Registrations
             .Select(r => r.Capabilities.ProviderId)
             .OrderBy(id => id, StringComparer.Ordinal)
             .ToList();
-            
+
         var rightProviderIds = right.Registrations
             .Select(r => r.Capabilities.ProviderId)
             .OrderBy(id => id, StringComparer.Ordinal)
             .ToList();
-            
+
         if (!leftProviderIds.SequenceEqual(rightProviderIds))
             return false;
-            
+
         // Check metadata (order-independent)
         var leftMetadata = left.Metadata ?? new Dictionary<string, object>();
         var rightMetadata = right.Metadata ?? new Dictionary<string, object>();
-        
+
         if (leftMetadata.Count != rightMetadata.Count)
             return false;
-            
+
         foreach (var kvp in leftMetadata)
         {
-            if (!rightMetadata.TryGetValue(kvp.Key, out var rightValue) || 
+            if (!rightMetadata.TryGetValue(kvp.Key, out var rightValue) ||
                 !Equals(kvp.Value, rightValue))
             {
                 return false;
             }
         }
-        
+
         return true;
     }
 }

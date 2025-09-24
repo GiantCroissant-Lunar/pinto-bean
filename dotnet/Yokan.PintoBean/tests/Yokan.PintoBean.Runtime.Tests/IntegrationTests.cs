@@ -27,7 +27,7 @@ public class IntegrationTests
         var analyticsStrategy = factory.CreateStrategy<IAnalyticsService>();
         Assert.Equal(SelectionStrategyType.FanOut, analyticsStrategy.StrategyType);
 
-        // Assert - Verify Resources gets PickOne by default  
+        // Assert - Verify Resources gets PickOne by default
         var resourceStrategy = factory.CreateStrategy<IResourceService>();
         Assert.Equal(SelectionStrategyType.PickOne, resourceStrategy.StrategyType);
 
@@ -51,7 +51,7 @@ public class IntegrationTests
         {
             // Override Analytics to use PickOne instead of default FanOut
             options.SetCategoryDefault(ServiceCategory.Analytics, SelectionStrategyType.PickOne);
-            
+
             // Override specific service to use Sharded
             options.UseStrategyFor<IResourceService>(SelectionStrategyType.Sharded);
         });
@@ -103,7 +103,7 @@ public class IntegrationTests
         // Arrange
         var services = new ServiceCollection();
         services.AddSelectionStrategies();
-        
+
         var serviceProvider = services.BuildServiceProvider();
         var factory = serviceProvider.GetRequiredService<ISelectionStrategyFactory>();
 
@@ -124,7 +124,7 @@ public class IntegrationTests
         var intelligenceStrategy = factory.CreateStrategy<IIntelligenceService>();
         Assert.Equal(SelectionStrategyType.PickOne, intelligenceStrategy.StrategyType);
 
-        // Test resource-related patterns  
+        // Test resource-related patterns
         var dataStrategy = factory.CreateStrategy<IDataService>();
         Assert.Equal(SelectionStrategyType.PickOne, dataStrategy.StrategyType);
 

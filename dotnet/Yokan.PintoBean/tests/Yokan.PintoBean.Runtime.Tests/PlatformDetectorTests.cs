@@ -17,7 +17,7 @@ public class PlatformDetectorTests
 
         // Assert
         Assert.True(Enum.IsDefined(typeof(Platform), currentPlatform));
-        
+
         // Should return the same value on subsequent calls (cached)
         var secondCall = PlatformDetector.CurrentPlatform;
         Assert.Equal(currentPlatform, secondCall);

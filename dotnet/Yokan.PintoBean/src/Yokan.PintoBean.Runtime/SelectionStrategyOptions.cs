@@ -69,8 +69,8 @@ public sealed class SelectionStrategyOptions
     /// <returns>The default selection strategy type for the category.</returns>
     public SelectionStrategyType GetDefaultForCategory(ServiceCategory category)
     {
-        return _categoryDefaults.TryGetValue(category, out var strategy) 
-            ? strategy 
+        return _categoryDefaults.TryGetValue(category, out var strategy)
+            ? strategy
             : SelectionStrategyType.PickOne;
     }
 
@@ -95,7 +95,7 @@ public sealed class SelectionStrategyOptions
     public SelectionStrategyOptions UseStrategyFor(Type serviceType, SelectionStrategyType strategyType)
     {
         if (serviceType == null) throw new ArgumentNullException(nameof(serviceType));
-        
+
         _serviceTypeOverrides[serviceType] = strategyType;
         return this;
     }
@@ -138,7 +138,7 @@ public sealed class SelectionStrategyOptions
     {
         if (strategyFactory == null) throw new ArgumentNullException(nameof(strategyFactory));
 
-        return UseCustomStrategyFor(typeof(TService), serviceProvider => 
+        return UseCustomStrategyFor(typeof(TService), serviceProvider =>
         {
             var typedStrategy = strategyFactory(serviceProvider);
             return (ISelectionStrategy)typedStrategy;

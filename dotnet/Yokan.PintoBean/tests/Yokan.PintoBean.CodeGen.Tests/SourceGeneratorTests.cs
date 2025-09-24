@@ -52,7 +52,7 @@ public class SourceGeneratorTests
         // Arrange
         var sourceWithAttribute = @"
             using Yokan.PintoBean.CodeGen;
-            
+
             [RealizeService(typeof(IService))]
             public partial class TestService { }
         ";

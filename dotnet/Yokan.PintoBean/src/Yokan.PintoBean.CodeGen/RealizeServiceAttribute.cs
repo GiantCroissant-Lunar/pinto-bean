@@ -11,8 +11,8 @@ namespace Yokan.PintoBean.CodeGen;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This attribute is only allowed in Tier-2 (Generated Façades), Tier-3 (Adapters), 
-/// and Tier-4 (Providers). Usage in Tier-1 (Contracts/Models) will generate analyzer 
+/// This attribute is only allowed in Tier-2 (Generated Façades), Tier-3 (Adapters),
+/// and Tier-4 (Providers). Usage in Tier-1 (Contracts/Models) will generate analyzer
 /// error SG0001.
 /// </para>
 /// <para>
@@ -40,10 +40,10 @@ public sealed class RealizeServiceAttribute : Attribute
     {
         if (contracts == null)
             throw new ArgumentNullException(nameof(contracts));
-            
+
         if (contracts.Length == 0)
             throw new ArgumentException("At least one contract must be specified.", nameof(contracts));
-            
+
         Contracts = contracts;
     }
 }

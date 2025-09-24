@@ -15,10 +15,10 @@ public class AttributeUsageSmokeTests
     {
         // Arrange
         var serviceType = typeof(TestServiceWithRealizeAttribute);
-        
+
         // Act
         var attributes = serviceType.GetCustomAttributes(typeof(RealizeServiceAttribute), false);
-        
+
         // Assert
         Assert.Single(attributes);
         var attribute = (RealizeServiceAttribute)attributes[0];
@@ -34,10 +34,10 @@ public class AttributeUsageSmokeTests
     {
         // Arrange
         var interfaceType = typeof(ISmokeTestServiceWithGenerateRegistry);
-        
+
         // Act
         var attributes = interfaceType.GetCustomAttributes(typeof(GenerateRegistryAttribute), false);
-        
+
         // Assert
         Assert.Single(attributes);
         var attribute = (GenerateRegistryAttribute)attributes[0];

@@ -264,7 +264,7 @@ public class ServiceRegistryTests
         var registry = new ServiceRegistry();
         var lowPriorityProvider = new TestHelloService("LowPriority");
         var highPriorityProvider = new TestHelloService("HighPriority");
-        
+
         var lowCapabilities = ProviderCapabilities.Create("low-priority")
             .WithPriority(Priority.Low);
         var highCapabilities = ProviderCapabilities.Create("high-priority")
