@@ -11,7 +11,9 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements and install Python dependencies
 COPY scripts/python/requirements-dev.txt /tmp/requirements-dev.txt
-RUN pip install --no-cache-dir --user -r /tmp/requirements-dev.txt
+# Add build arg to force cache invalidation when needed
+ARG CACHE_BUST=default
+RUN echo "Cache bust: $CACHE_BUST" && pip install --no-cache-dir --user -r /tmp/requirements-dev.txt
 
 # Final lightweight image
 FROM python:3.11-slim
