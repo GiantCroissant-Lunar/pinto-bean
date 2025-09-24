@@ -44,3 +44,48 @@ public interface IAspectRuntime
     /// <param name="tags">Optional tags for categorization.</param>
     void RecordMetric(string name, double value, params (string Key, object Value)[] tags);
 }
+
+/// <summary>
+/// No-operation implementation of IAspectRuntime that performs no actual telemetry collection.
+/// Used for scenarios where telemetry is disabled or not needed.
+/// </summary>
+public sealed class NoOpAspectRuntime : IAspectRuntime
+{
+    /// <summary>
+    /// Singleton instance of the no-op aspect runtime.
+    /// </summary>
+    public static readonly NoOpAspectRuntime Instance = new();
+
+    private NoOpAspectRuntime() { }
+
+    /// <inheritdoc />
+    public IDisposable EnterMethod(Type serviceType, string methodName, object?[] parameters)
+    {
+        return NoOpContext.Instance;
+    }
+
+    /// <inheritdoc />
+    public void ExitMethod(IDisposable context, object? result)
+    {
+        // No-op
+    }
+
+    /// <inheritdoc />
+    public void RecordException(IDisposable context, Exception exception)
+    {
+        // No-op
+    }
+
+    /// <inheritdoc />
+    public void RecordMetric(string name, double value, params (string Key, object Value)[] tags)
+    {
+        // No-op
+    }
+
+    private sealed class NoOpContext : IDisposable
+    {
+        public static readonly NoOpContext Instance = new();
+        private NoOpContext() { }
+        public void Dispose() { }
+    }
+}
