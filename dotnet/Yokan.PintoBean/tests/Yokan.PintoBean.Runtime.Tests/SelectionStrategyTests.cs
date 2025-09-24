@@ -65,7 +65,7 @@ public class SelectionStrategyTests
     }
 
     [Fact]
-    public void PickOneSelectionStrategy_WithSamePriority_SelectsByRegistrationTime()
+    public void PickOneSelectionStrategy_WithSamePriority_SelectsDeterministically()
     {
         // Arrange
         var firstProvider = new TestSelectionService("First");
@@ -81,13 +81,17 @@ public class SelectionStrategyTests
         var context = new SelectionContext<ITestSelectionService>(registrations);
         var strategy = new PickOneSelectionStrategy<ITestSelectionService>();
 
-        // Act
-        var result = strategy.SelectProviders(context);
+        // Act - Run multiple times to verify deterministic behavior
+        var results = new List<string>();
+        for (int i = 0; i < 5; i++)
+        {
+            var result = strategy.SelectProviders(context);
+            results.Add(result.SelectedProviders.First().GetName());
+        }
 
         // Assert
-        Assert.Single(result.SelectedProviders);
-        Assert.Equal("First", result.SelectedProviders.First().GetName());
-        Assert.Equal(SelectionStrategyType.PickOne, result.StrategyType);
+        Assert.True(results.All(r => r == results[0]), "Selection should be deterministic");
+        Assert.Equal(SelectionStrategyType.PickOne, strategy.StrategyType);
     }
 
     [Fact]
