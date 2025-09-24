@@ -4,8 +4,10 @@ name: CodeQL
 'on':
   push:
     branches: [main]
+    paths: ['scripts/python/**']
   pull_request:
     branches: [main]
+    paths: ['scripts/python/**']
   schedule:
     - cron: '29 3 * * 1'  # Weekly Monday 03:29 UTC
   workflow_dispatch: {}
