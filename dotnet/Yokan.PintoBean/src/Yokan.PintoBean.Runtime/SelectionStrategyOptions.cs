@@ -63,6 +63,46 @@ public sealed class SelectionStrategyOptions
     }
 
     /// <summary>
+    /// Gets or sets the default selection strategy for Analytics services.
+    /// This property supports configuration binding.
+    /// </summary>
+    public SelectionStrategyType Analytics
+    {
+        get => GetDefaultForCategory(ServiceCategory.Analytics);
+        set => SetCategoryDefault(ServiceCategory.Analytics, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the default selection strategy for Resources services.
+    /// This property supports configuration binding.
+    /// </summary>
+    public SelectionStrategyType Resources
+    {
+        get => GetDefaultForCategory(ServiceCategory.Resources);
+        set => SetCategoryDefault(ServiceCategory.Resources, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the default selection strategy for SceneFlow services.
+    /// This property supports configuration binding.
+    /// </summary>
+    public SelectionStrategyType SceneFlow
+    {
+        get => GetDefaultForCategory(ServiceCategory.SceneFlow);
+        set => SetCategoryDefault(ServiceCategory.SceneFlow, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the default selection strategy for AI services.
+    /// This property supports configuration binding.
+    /// </summary>
+    public SelectionStrategyType AI
+    {
+        get => GetDefaultForCategory(ServiceCategory.AI);
+        set => SetCategoryDefault(ServiceCategory.AI, value);
+    }
+
+    /// <summary>
     /// Gets the default selection strategy for the specified service category.
     /// </summary>
     /// <param name="category">The service category.</param>
