@@ -145,7 +145,7 @@ public sealed class PickOneSelectionStrategy<TService> : ISelectionStrategy<TSer
     /// Applies capability filtering based on required tags in selection metadata.
     /// </summary>
     private static IEnumerable<IProviderRegistration> ApplyCapabilityFilter(
-        IEnumerable<IProviderRegistration> candidates, 
+        IEnumerable<IProviderRegistration> candidates,
         IDictionary<string, object>? metadata)
     {
         if (metadata == null || !metadata.TryGetValue("RequiredTags", out var tagsObj))
@@ -234,13 +234,13 @@ public sealed class PickOneSelectionStrategy<TService> : ISelectionStrategy<TSer
             {
                 _registry.ProviderChanged -= OnProviderChanged;
             }
-            
+
             // Dispose the cache if it implements IDisposable
             if (_cache is IDisposable disposableCache)
             {
                 disposableCache.Dispose();
             }
-            
+
             _disposed = true;
         }
     }
@@ -442,7 +442,7 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
     /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
     public ShardedSelectionStrategy(
         Func<IDictionary<string, object>?, string> keyExtractor,
-        IServiceRegistry? registry = null, 
+        IServiceRegistry? registry = null,
         TimeSpan? cacheTtl = null,
         IAspectRuntime? aspectRuntime = null)
     {
@@ -573,7 +573,7 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
     /// Applies capability filtering based on required tags in selection metadata.
     /// </summary>
     private static IEnumerable<IProviderRegistration> ApplyCapabilityFilter(
-        IEnumerable<IProviderRegistration> candidates, 
+        IEnumerable<IProviderRegistration> candidates,
         IDictionary<string, object>? metadata)
     {
         if (metadata == null || !metadata.TryGetValue("RequiredTags", out var tagsObj))
@@ -668,13 +668,13 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
             {
                 _registry.ProviderChanged -= OnProviderChanged;
             }
-            
+
             // Dispose the cache if it implements IDisposable
             if (_cache is IDisposable disposableCache)
             {
                 disposableCache.Dispose();
             }
-            
+
             _disposed = true;
         }
     }
@@ -694,7 +694,7 @@ public static class DefaultSelectionStrategies
     /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
     /// <returns>A PickOne selection strategy instance.</returns>
     public static ISelectionStrategy<TService> CreatePickOne<TService>(
-        IServiceRegistry? registry = null, 
+        IServiceRegistry? registry = null,
         TimeSpan? cacheTtl = null,
         IAspectRuntime? aspectRuntime = null)
         where TService : class
@@ -727,14 +727,14 @@ public static class DefaultSelectionStrategies
     /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
     /// <returns>A Sharded selection strategy instance with analytics key extraction.</returns>
     public static ISelectionStrategy<TService> CreateAnalyticsSharded<TService>(
-        IServiceRegistry? registry = null, 
+        IServiceRegistry? registry = null,
         TimeSpan? cacheTtl = null,
         IAspectRuntime? aspectRuntime = null)
         where TService : class
     {
         return new ShardedSelectionStrategy<TService>(
-            ExtractAnalyticsShardKey, 
-            registry, 
+            ExtractAnalyticsShardKey,
+            registry,
             cacheTtl,
             aspectRuntime);
     }
@@ -750,7 +750,7 @@ public static class DefaultSelectionStrategies
     /// <returns>A Sharded selection strategy instance with custom key extraction.</returns>
     public static ISelectionStrategy<TService> CreateSharded<TService>(
         Func<IDictionary<string, object>?, string> keyExtractor,
-        IServiceRegistry? registry = null, 
+        IServiceRegistry? registry = null,
         TimeSpan? cacheTtl = null,
         IAspectRuntime? aspectRuntime = null)
         where TService : class

@@ -17,12 +17,12 @@ public class ProviderSelectionCacheIntegrationTests
     public void PickOneStrategy_ProviderRegistrationChanged_InvalidatesCache()
     {
         // Arrange
-        var registry = new ServiceRegistry();  
+        var registry = new ServiceRegistry();
         var strategy = new PickOneSelectionStrategy<ITestCacheService>(registry, TimeSpan.FromMinutes(10));
-        
+
         var provider1 = new TestCacheService("Provider1");
         var provider2 = new TestCacheService("Provider2");
-        
+
         // Register first provider
         var capabilities1 = new ProviderCapabilities
         {
@@ -32,42 +32,42 @@ public class ProviderSelectionCacheIntegrationTests
             Platform = Platform.Any
         };
         var registration1 = registry.Register(provider1, capabilities1);
-        
+
         var registrations = new List<IProviderRegistration> { registration1 };
         var context = new SelectionContext<ITestCacheService>(registrations);
-        
+
         // Execute and cache result
         var result1 = strategy.SelectProviders(context);
-        
+
         // Execute again to verify caching
         var result2 = strategy.SelectProviders(context);
-        
+
         // Both results should be the same (from cache)
         Assert.Single(result1.SelectedProviders);
         Assert.Single(result2.SelectedProviders);
         Assert.Equal("Provider1", ((TestCacheService)result1.SelectedProviders[0]).Name);
         Assert.Equal("Provider1", ((TestCacheService)result2.SelectedProviders[0]).Name);
-        
+
         // Act - Register second provider (should trigger ProviderChanged event)
         var capabilities2 = new ProviderCapabilities
         {
-            ProviderId = "provider-2", 
+            ProviderId = "provider-2",
             Priority = Priority.High, // Higher priority
             RegisteredAt = DateTime.UtcNow,
             Platform = Platform.Any
         };
         var registration2 = registry.Register(provider2, capabilities2);
-        
+
         var newRegistrations = new List<IProviderRegistration> { registration1, registration2 };
         var newContext = new SelectionContext<ITestCacheService>(newRegistrations);
-        
+
         // Execute again - should not use cache due to provider change
         var result3 = strategy.SelectProviders(newContext);
-        
+
         // Assert - Should now select the higher priority provider
         Assert.Single(result3.SelectedProviders);
         Assert.Equal("Provider2", ((TestCacheService)result3.SelectedProviders[0]).Name);
-        
+
         // Cleanup
         strategy.Dispose();
     }
@@ -79,11 +79,11 @@ public class ProviderSelectionCacheIntegrationTests
         var registry = new ServiceRegistry();
         var keyExtractor = (IDictionary<string, object>? metadata) =>
             metadata?.TryGetValue("ShardKey", out var key) == true ? key.ToString()! : "default";
-        
+
         var strategy = new ShardedSelectionStrategy<ITestCacheService>(keyExtractor, registry, TimeSpan.FromMinutes(10));
-        
+
         var provider1 = new TestCacheService("Provider1");
-        
+
         // Register first provider
         var capabilities1 = new ProviderCapabilities
         {
@@ -93,21 +93,21 @@ public class ProviderSelectionCacheIntegrationTests
             Platform = Platform.Any
         };
         var registration1 = registry.Register(provider1, capabilities1);
-        
+
         var registrations = new List<IProviderRegistration> { registration1 };
         var metadata = new Dictionary<string, object> { ["ShardKey"] = "shard1" };
         var context = new SelectionContext<ITestCacheService>(registrations, metadata);
-        
+
         // Execute and cache result
         var result1 = strategy.SelectProviders(context);
         var result2 = strategy.SelectProviders(context);
-        
+
         // Both results should be the same (from cache)
         Assert.Single(result1.SelectedProviders);
         Assert.Single(result2.SelectedProviders);
         Assert.Equal("Provider1", ((TestCacheService)result1.SelectedProviders[0]).Name);
         Assert.Equal("Provider1", ((TestCacheService)result2.SelectedProviders[0]).Name);
-        
+
         // Act - Register second provider
         var provider2 = new TestCacheService("Provider2");
         var capabilities2 = new ProviderCapabilities
@@ -118,17 +118,17 @@ public class ProviderSelectionCacheIntegrationTests
             Platform = Platform.Any
         };
         var registration2 = registry.Register(provider2, capabilities2);
-        
+
         var newRegistrations = new List<IProviderRegistration> { registration1, registration2 };
         var newContext = new SelectionContext<ITestCacheService>(newRegistrations, metadata);
-        
+
         // Execute again - should not use cache due to provider change
         var result3 = strategy.SelectProviders(newContext);
-        
+
         // Assert - Should select based on sharded routing algorithm
         Assert.Single(result3.SelectedProviders);
         Assert.Contains(((TestCacheService)result3.SelectedProviders[0]).Name, new[] { "Provider1", "Provider2" });
-        
+
         // Cleanup
         strategy.Dispose();
     }
@@ -139,10 +139,10 @@ public class ProviderSelectionCacheIntegrationTests
         // Arrange
         var registry = new ServiceRegistry();
         var strategy = new PickOneSelectionStrategy<ITestCacheService>(registry, TimeSpan.FromMinutes(10));
-        
+
         var provider1 = new TestCacheService("Provider1");
         var provider2 = new TestCacheService("Provider2");
-        
+
         // Register both providers
         var capabilities1 = new ProviderCapabilities
         {
@@ -152,7 +152,7 @@ public class ProviderSelectionCacheIntegrationTests
             Platform = Platform.Any
         };
         var registration1 = registry.Register(provider1, capabilities1);
-        
+
         var capabilities2 = new ProviderCapabilities
         {
             ProviderId = "provider-2",
@@ -161,27 +161,27 @@ public class ProviderSelectionCacheIntegrationTests
             Platform = Platform.Any
         };
         var registration2 = registry.Register(provider2, capabilities2);
-        
+
         var registrations = new List<IProviderRegistration> { registration1, registration2 };
         var context = new SelectionContext<ITestCacheService>(registrations);
-        
+
         // Execute and cache result - should select high priority provider
         var result1 = strategy.SelectProviders(context);
         Assert.Equal("Provider2", ((TestCacheService)result1.SelectedProviders[0]).Name);
-        
+
         // Act - Unregister high priority provider
         registry.Unregister(registration2);
-        
+
         var newRegistrations = new List<IProviderRegistration> { registration1 };
         var newContext = new SelectionContext<ITestCacheService>(newRegistrations);
-        
+
         // Execute again - should not use cache and select remaining provider
         var result2 = strategy.SelectProviders(newContext);
-        
+
         // Assert
         Assert.Single(result2.SelectedProviders);
         Assert.Equal("Provider1", ((TestCacheService)result2.SelectedProviders[0]).Name);
-        
+
         // Cleanup
         strategy.Dispose();
     }
@@ -193,17 +193,17 @@ public class ProviderSelectionCacheIntegrationTests
         using var cache = new SelectionCache<ITestCacheService>(TimeSpan.FromMinutes(1));
         var provider = new TestCacheService("ThreadSafeProvider");
         var result = SelectionResult<ITestCacheService>.Single(provider, SelectionStrategyType.PickOne);
-        
+
         var contexts = new List<ISelectionContext<ITestCacheService>>();
         for (int i = 0; i < 10; i++)
         {
             contexts.Add(CreateTestContext($"Provider{i}", $"provider-{i}"));
         }
-        
+
         // Act - Perform concurrent set/get operations
         var tasks = new List<Thread>();
         var exceptions = new List<Exception>();
-        
+
         for (int i = 0; i < 10; i++)
         {
             var index = i;
@@ -213,10 +213,10 @@ public class ProviderSelectionCacheIntegrationTests
                 {
                     // Set operation
                     cache.Set(contexts[index], result);
-                    
+
                     // Get operation
                     var cachedResult = cache.TryGet(contexts[index]);
-                    
+
                     // Remove operation
                     cache.Remove(contexts[index]);
                 }
@@ -230,19 +230,19 @@ public class ProviderSelectionCacheIntegrationTests
             });
             tasks.Add(thread);
         }
-        
+
         // Start all threads
         foreach (var task in tasks)
         {
             task.Start();
         }
-        
+
         // Wait for all threads to complete
         foreach (var task in tasks)
         {
             task.Join(5000); // 5 second timeout
         }
-        
+
         // Assert - No exceptions should have occurred
         Assert.Empty(exceptions);
     }
@@ -253,21 +253,21 @@ public class ProviderSelectionCacheIntegrationTests
         // Arrange
         var provider1 = new TestCacheService("Provider1");
         var provider2 = new TestCacheService("Provider2");
-        
+
         var registration1 = CreateRegistration(provider1, Priority.Normal, DateTime.UtcNow, "provider-1");
         var registration2 = CreateRegistration(provider2, Priority.High, DateTime.UtcNow.AddSeconds(1), "provider-2");
-        
+
         var registrations = new List<IProviderRegistration> { registration1, registration2 };
-        
+
         // Create two contexts with same registrations
         var context1 = new SelectionContext<ITestCacheService>(registrations);
         var context2 = new SelectionContext<ITestCacheService>(registrations);
-        
+
         // Act & Assert - Hash codes should be the same
         var hash1 = SelectionContextHashHelper.GetHashCode(context1);
         var hash2 = SelectionContextHashHelper.GetHashCode(context2);
         Assert.Equal(hash1, hash2);
-        
+
         // Equivalence should be true
         Assert.True(SelectionContextHashHelper.AreEquivalent(context1, context2));
     }
@@ -279,18 +279,18 @@ public class ProviderSelectionCacheIntegrationTests
         var provider = new TestCacheService("Provider1");
         var registration = CreateRegistration(provider, Priority.Normal, DateTime.UtcNow, "provider-1");
         var registrations = new List<IProviderRegistration> { registration };
-        
+
         var metadata1 = new Dictionary<string, object> { ["Key1"] = "Value1" };
         var metadata2 = new Dictionary<string, object> { ["Key1"] = "Value2" };
-        
+
         var context1 = new SelectionContext<ITestCacheService>(registrations, metadata1);
         var context2 = new SelectionContext<ITestCacheService>(registrations, metadata2);
-        
+
         // Act & Assert - Hash codes should be different
         var hash1 = SelectionContextHashHelper.GetHashCode(context1);
         var hash2 = SelectionContextHashHelper.GetHashCode(context2);
         Assert.NotEqual(hash1, hash2);
-        
+
         // Equivalence should be false
         Assert.False(SelectionContextHashHelper.AreEquivalent(context1, context2));
     }
@@ -300,13 +300,13 @@ public class ProviderSelectionCacheIntegrationTests
         var provider = new TestCacheService(providerName);
         var registration = CreateRegistration(provider, Priority.Normal, DateTime.UtcNow, providerId);
         var registrations = new List<IProviderRegistration> { registration };
-        
+
         return new SelectionContext<ITestCacheService>(registrations);
     }
 
     private static IProviderRegistration CreateRegistration(
-        ITestCacheService provider, 
-        Priority priority, 
+        ITestCacheService provider,
+        Priority priority,
         DateTime registeredAt,
         string providerId)
     {

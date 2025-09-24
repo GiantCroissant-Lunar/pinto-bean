@@ -23,11 +23,11 @@ public class HelloRequestTests
     public void HelloRequest_WithAllProperties_ShouldCreate()
     {
         // Arrange & Act
-        var request = new HelloRequest 
-        { 
-            Name = "Alice", 
-            Language = "fr", 
-            Context = "formal" 
+        var request = new HelloRequest
+        {
+            Name = "Alice",
+            Language = "fr",
+            Context = "formal"
         };
 
         // Assert

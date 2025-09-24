@@ -57,15 +57,15 @@ public class AcceptanceCriteriaTests
     {
         // Arrange: Create service registry and providers
         var registry = new ServiceRegistry();
-        
+
         var primaryProvider = new MockHelloService("PrimaryHelloService");
         var fallbackProvider = new MockHelloService("FallbackHelloService");
-        
+
         var primaryCapabilities = ProviderCapabilities.Create("primary-hello")
             .WithPriority(Priority.High)
             .WithPlatform(Platform.Any)
             .WithTags("primary", "greeting");
-            
+
         var fallbackCapabilities = ProviderCapabilities.Create("fallback-hello")
             .WithPriority(Priority.Low)
             .WithPlatform(Platform.Any)
@@ -79,14 +79,14 @@ public class AcceptanceCriteriaTests
         Assert.NotNull(primaryRegistration);
         Assert.NotNull(fallbackRegistration);
         Assert.True(registry.HasRegistrations<IHelloService>());
-        
+
         var registrations = registry.GetRegistrations<IHelloService>().ToList();
         Assert.Equal(2, registrations.Count);
-        
+
         // Verify registration details
         var primaryReg = registrations.First(r => r.Capabilities.ProviderId == "primary-hello");
         var fallbackReg = registrations.First(r => r.Capabilities.ProviderId == "fallback-hello");
-        
+
         Assert.Equal(Priority.High, primaryReg.Capabilities.Priority);
         Assert.Equal(Priority.Low, fallbackReg.Capabilities.Priority);
         Assert.True(primaryReg.Capabilities.HasTags("primary", "greeting"));
@@ -98,14 +98,14 @@ public class AcceptanceCriteriaTests
     {
         // Arrange: Set up registry with prioritized providers
         var registry = new ServiceRegistry();
-        
+
         var primaryProvider = new MockHelloService("PrimaryService");
         var secondaryProvider = new MockHelloService("SecondaryService");
-        
+
         // Register secondary first to test priority selection
-        registry.Register<IHelloService>(secondaryProvider, 
+        registry.Register<IHelloService>(secondaryProvider,
             ProviderCapabilities.Create("secondary").WithPriority(Priority.Low));
-        registry.Register<IHelloService>(primaryProvider, 
+        registry.Register<IHelloService>(primaryProvider,
             ProviderCapabilities.Create("primary").WithPriority(Priority.High));
 
         var typedRegistry = registry.For<IHelloService>();
@@ -119,11 +119,11 @@ public class AcceptanceCriteriaTests
         Assert.NotNull(response);
         Assert.Equal("Hello, World! (from PrimaryService)", response.Message);
         Assert.Equal("PrimaryService", response.ServiceInfo);
-        
+
         // Verify call was logged in primary provider
         Assert.Single(primaryProvider.CallLog);
         Assert.Equal("SayHello(World)", primaryProvider.CallLog[0]);
-        
+
         // Verify secondary provider was not called
         Assert.Empty(secondaryProvider.CallLog);
     }
@@ -134,40 +134,40 @@ public class AcceptanceCriteriaTests
         // Arrange: Set up registry with event tracking
         var registry = new ServiceRegistry();
         var eventList = new List<ProviderChangedEventArgs>();
-        
+
         registry.ProviderChanged += (sender, e) => eventList.Add(e);
-        
+
         var provider = new MockHelloService("TestService");
         var capabilities = ProviderCapabilities.Create("test-service");
 
         // Act & Assert: Test registration event
         var registration = registry.Register<IHelloService>(provider, capabilities);
-        
+
         Assert.Single(eventList);
         var addEvent = eventList[0];
         Assert.Equal(ProviderChangeType.Added, addEvent.ChangeType);
         Assert.Equal(typeof(IHelloService), addEvent.ServiceType);
         Assert.Same(registration, addEvent.Registration);
-        
+
         eventList.Clear();
 
         // Act & Assert: Test unregistration event
         registry.Unregister(registration);
-        
+
         Assert.Single(eventList);
         var removeEvent = eventList[0];
         Assert.Equal(ProviderChangeType.Removed, removeEvent.ChangeType);
         Assert.Equal(typeof(IHelloService), removeEvent.ServiceType);
         Assert.Same(registration, removeEvent.Registration);
-        
+
         eventList.Clear();
 
         // Act & Assert: Test clear registrations event
         registry.Register<IHelloService>(provider, capabilities);
         eventList.Clear(); // Clear the registration event from above
-        
+
         registry.ClearRegistrations<IHelloService>();
-        
+
         Assert.Single(eventList);
         var clearEvent = eventList[0];
         Assert.Equal(ProviderChangeType.Removed, clearEvent.ChangeType);
@@ -180,7 +180,7 @@ public class AcceptanceCriteriaTests
         // Arrange: Set up DI container with service registry
         var services = new ServiceCollection();
         services.AddServiceRegistry();
-        
+
         var serviceProvider = services.BuildServiceProvider();
 
         // Act: Resolve service registry from DI
@@ -189,15 +189,15 @@ public class AcceptanceCriteriaTests
         // Assert: Registry is available and functional
         Assert.NotNull(registry);
         Assert.IsType<ServiceRegistry>(registry);
-        
+
         // Verify it's a singleton
         var registry2 = serviceProvider.GetRequiredService<IServiceRegistry>();
         Assert.Same(registry, registry2);
-        
+
         // Verify it works with provider registration
         var provider = new MockHelloService("DIRegisteredService");
         var capabilities = ProviderCapabilities.Create("di-service");
-        
+
         var registration = registry.Register<IHelloService>(provider, capabilities);
         Assert.NotNull(registration);
         Assert.True(registry.HasRegistrations<IHelloService>());
@@ -209,20 +209,20 @@ public class AcceptanceCriteriaTests
         // Arrange: Set up DI container with registry configuration
         var services = new ServiceCollection();
         var configurationCalled = false;
-        
+
         services.AddServiceRegistry(registry =>
         {
             configurationCalled = true;
-            
+
             // Pre-register a provider during configuration
             var provider = new MockHelloService("ConfiguredService");
             var capabilities = ProviderCapabilities.Create("configured-service")
                 .WithPriority(Priority.High)
                 .WithTags("configured", "bootstrap");
-                
+
             registry.Register<IHelloService>(provider, capabilities);
         });
-        
+
         var serviceProvider = services.BuildServiceProvider();
 
         // Act: Resolve and verify configured registry
@@ -231,10 +231,10 @@ public class AcceptanceCriteriaTests
         // Assert: Configuration was applied
         Assert.True(configurationCalled);
         Assert.True(registry.HasRegistrations<IHelloService>());
-        
+
         var registrations = registry.GetRegistrations<IHelloService>().ToList();
         Assert.Single(registrations);
-        
+
         var configuredReg = registrations[0];
         Assert.Equal("configured-service", configuredReg.Capabilities.ProviderId);
         Assert.Equal(Priority.High, configuredReg.Capabilities.Priority);
@@ -252,33 +252,33 @@ public class AcceptanceCriteriaTests
             var analyticsProvider = new MockHelloService("AnalyticsService");
             var primaryProvider = new MockHelloService("PrimaryService");
             var fallbackProvider = new MockHelloService("FallbackService");
-            
+
             registry.Register<IHelloService>(analyticsProvider,
                 ProviderCapabilities.Create("analytics-hello")
                     .WithPriority(Priority.Normal)
                     .WithTags("analytics", "telemetry"));
-                    
+
             registry.Register<IHelloService>(primaryProvider,
                 ProviderCapabilities.Create("primary-hello")
                     .WithPriority(Priority.High)
                     .WithTags("primary", "production"));
-                    
+
             registry.Register<IHelloService>(fallbackProvider,
                 ProviderCapabilities.Create("fallback-hello")
                     .WithPriority(Priority.Low)
                     .WithTags("fallback", "backup"));
         });
-        
+
         var serviceProvider = services.BuildServiceProvider();
 
         // Act: Complete workflow
         var registry = serviceProvider.GetRequiredService<IServiceRegistry>();
         var typedRegistry = registry.For<IHelloService>();
-        
+
         // Verify we have all three providers
         var allRegistrations = typedRegistry.GetRegistrations().ToList();
         Assert.Equal(3, allRegistrations.Count);
-        
+
         // Invoke the service (should select highest priority = primary)
         var request = new HelloRequest { Name = "Integration Test" };
         var response = await typedRegistry.InvokeAsync((service, ct) =>
@@ -288,7 +288,7 @@ public class AcceptanceCriteriaTests
         Assert.NotNull(response);
         Assert.Equal("Hello, Integration Test! (from PrimaryService)", response.Message);
         Assert.Equal("PrimaryService", response.ServiceInfo);
-        
+
         // Verify provider selection worked correctly
         var primaryProvider = (MockHelloService)allRegistrations
             .First(r => r.Capabilities.ProviderId == "primary-hello").Provider;
@@ -302,29 +302,29 @@ public class AcceptanceCriteriaTests
         // Arrange: Test that ProviderChanged events support cache invalidation
         var registry = new ServiceRegistry();
         var cacheInvalidationCount = 0;
-        
+
         // Simulate cache invalidation on provider changes
         registry.ProviderChanged += (sender, e) =>
         {
             cacheInvalidationCount++;
             // In a real implementation, this would invalidate selection strategy caches
         };
-        
+
         var provider1 = new MockHelloService("Service1");
         var provider2 = new MockHelloService("Service2");
-        
+
         // Act: Multiple registry operations that should trigger cache invalidation
         var reg1 = registry.Register<IHelloService>(provider1,
             ProviderCapabilities.Create("service-1"));
         // Cache invalidation: +1
-        
+
         var reg2 = registry.Register<IHelloService>(provider2,
             ProviderCapabilities.Create("service-2"));
         // Cache invalidation: +2
-        
+
         registry.Unregister(reg1);
         // Cache invalidation: +3
-        
+
         registry.ClearRegistrations<IHelloService>();
         // Cache invalidation: +4 (for removing reg2)
 

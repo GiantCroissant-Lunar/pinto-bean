@@ -108,7 +108,7 @@ public class DefaultSelectionStrategyFactoryTests
     [Fact]
     public void CreateStrategy_NonGeneric_ShouldReturnNonGenericStrategy()
     {
-        // Arrange  
+        // Arrange
         var services = new ServiceCollection();
         var serviceProvider = services.BuildServiceProvider();
         var options = new SelectionStrategyOptions();

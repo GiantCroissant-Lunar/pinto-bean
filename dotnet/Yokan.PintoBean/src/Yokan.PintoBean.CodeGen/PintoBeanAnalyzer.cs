@@ -124,7 +124,7 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
     private static AttributeData? GetRealizeServiceAttribute(INamedTypeSymbol classSymbol)
     {
         return classSymbol.GetAttributes()
-            .FirstOrDefault(attr => 
+            .FirstOrDefault(attr =>
             {
                 var attributeClass = attr.AttributeClass;
                 return attributeClass?.Name == "RealizeServiceAttribute" &&
@@ -150,13 +150,13 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
 
         // SG0002: Check if RealizeService has zero contracts
         var contractTypes = GetContractTypesFromAttribute(realizeServiceAttribute);
-        
+
         // Fallback to syntax-based parsing if semantic analysis failed
         if (contractTypes.Length == 0)
         {
             contractTypes = GetContractTypesFromAttributeFallback(context, classDeclaration, classSymbol);
         }
-        
+
         if (contractTypes.Length == 0)
         {
             var diagnostic = Diagnostic.Create(
@@ -242,7 +242,7 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
     {
         // Simplified category detection - in practice, this would be more sophisticated
         var categories = contractTypes.Select(GetContractCategory).Distinct().ToArray();
-        
+
         if (categories.Length > 1)
         {
             var categoriesString = string.Join(", ", categories);
@@ -261,9 +261,9 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
         // Heuristic: Tier-1 projects typically have "Contracts", "Models", or "Abstractions" in their name
         // and don't reference Runtime or other implementation assemblies
         var assemblyName = compilation.AssemblyName?.ToLowerInvariant() ?? "";
-        
-        return assemblyName.Contains("contracts") || 
-               assemblyName.Contains("models") || 
+
+        return assemblyName.Contains("contracts") ||
+               assemblyName.Contains("models") ||
                assemblyName.Contains("abstractions");
     }
 
@@ -290,9 +290,9 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
         // In Roslyn, this can appear as:
         // 1. A single TypedConstant of Kind.Array when multiple types: [RealizeService(typeof(A), typeof(B))]
         // 2. Individual TypedConstant arguments when expanded: could be individual Type arguments
-        
+
         var firstArgument = attribute.ConstructorArguments[0];
-        
+
         // Case 1: Single array argument (multiple types passed to params)
         if (firstArgument.Kind == TypedConstantKind.Array)
         {
@@ -355,7 +355,7 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
     {
         // Simplified category detection based on namespace or naming patterns
         var namespaceParts = contractType.ContainingNamespace?.ToDisplayString().Split('.') ?? new string[0];
-        
+
         // Look for common category indicators in the namespace
         foreach (var part in namespaceParts)
         {

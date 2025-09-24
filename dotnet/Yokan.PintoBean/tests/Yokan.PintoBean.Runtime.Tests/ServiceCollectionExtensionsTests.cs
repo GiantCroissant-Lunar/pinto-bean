@@ -98,7 +98,7 @@ public class ServiceCollectionExtensionsTests
         var registry = serviceProvider.GetService<IServiceRegistry>();
         var options = serviceProvider.GetService<SelectionStrategyOptions>();
         var factory = serviceProvider.GetService<ISelectionStrategyFactory>();
-        
+
         Assert.NotNull(registry);
         Assert.NotNull(options);
         Assert.NotNull(factory);

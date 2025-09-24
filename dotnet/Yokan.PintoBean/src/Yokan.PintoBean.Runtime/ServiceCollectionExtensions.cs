@@ -73,7 +73,7 @@ public static class ServiceCollectionExtensions
             if (configure != null)
             {
                 services.Remove(existingDescriptor);
-                
+
                 // If it was a singleton with an instance, get the instance and configure it
                 if (existingDescriptor.ImplementationInstance is SelectionStrategyOptions existingOptions)
                 {
@@ -115,7 +115,7 @@ public static class ServiceCollectionExtensions
     {
         if (services == null) throw new ArgumentNullException(nameof(services));
 
-        return services.AddSelectionStrategies(options => 
+        return services.AddSelectionStrategies(options =>
             options.UseStrategyFor<TService>(SelectionStrategyType.PickOne));
     }
 
@@ -131,7 +131,7 @@ public static class ServiceCollectionExtensions
     {
         if (services == null) throw new ArgumentNullException(nameof(services));
 
-        return services.AddSelectionStrategies(options => 
+        return services.AddSelectionStrategies(options =>
             options.UseStrategyFor<TService>(SelectionStrategyType.FanOut));
     }
 
@@ -147,7 +147,7 @@ public static class ServiceCollectionExtensions
     {
         if (services == null) throw new ArgumentNullException(nameof(services));
 
-        return services.AddSelectionStrategies(options => 
+        return services.AddSelectionStrategies(options =>
             options.UseStrategyFor<TService>(SelectionStrategyType.Sharded));
     }
 }

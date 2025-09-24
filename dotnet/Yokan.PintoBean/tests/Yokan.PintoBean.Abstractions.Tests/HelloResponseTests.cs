@@ -28,8 +28,8 @@ public class HelloResponseTests
         var timestamp = DateTime.UtcNow;
 
         // Act
-        var response = new HelloResponse 
-        { 
+        var response = new HelloResponse
+        {
             Message = "Bonjour, Alice!",
             Language = "fr",
             ServiceInfo = "TestService v1.0",
@@ -48,21 +48,21 @@ public class HelloResponseTests
     {
         // Arrange
         var timestamp = DateTime.UtcNow;
-        var response1 = new HelloResponse 
-        { 
-            Message = "Hello!", 
+        var response1 = new HelloResponse
+        {
+            Message = "Hello!",
             Language = "en",
             Timestamp = timestamp
         };
-        var response2 = new HelloResponse 
-        { 
-            Message = "Hello!", 
+        var response2 = new HelloResponse
+        {
+            Message = "Hello!",
             Language = "en",
             Timestamp = timestamp
         };
-        var response3 = new HelloResponse 
-        { 
-            Message = "Hola!", 
+        var response3 = new HelloResponse
+        {
+            Message = "Hola!",
             Language = "es",
             Timestamp = timestamp
         };

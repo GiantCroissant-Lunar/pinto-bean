@@ -164,7 +164,7 @@ public class SelectionStrategyTests
         Assert.Equal(cancellationToken, context.CancellationToken);
     }
 
-    [Fact]  
+    [Fact]
     public void SelectionResult_Single_CreatesResultWithSingleProvider()
     {
         // Arrange
@@ -233,7 +233,7 @@ public class SelectionStrategyTests
         Assert.Equal(SelectionStrategyType.FanOut, result.StrategyType);
         Assert.NotNull(result.SelectionMetadata);
         Assert.Equal(3, result.SelectionMetadata["ProviderCount"]);
-        
+
         // Verify all providers are included
         var providerNames = result.SelectedProviders.Select(p => p.GetName()).ToHashSet();
         Assert.Contains("Provider1", providerNames);
@@ -330,7 +330,7 @@ public class SelectionStrategyTests
         {
             CreateRegistration(provider, Priority.Normal, DateTime.UtcNow)
         };
-        
+
         var metadata = new Dictionary<string, object>
         {
             ["RequiredTags"] = new[] { "nonexistent" }
@@ -403,7 +403,7 @@ public class SelectionStrategyTests
         Assert.Equal(2, result.SelectionMetadata["ProviderCount"]);
         Assert.Equal("FanOut (all compatible providers)", result.SelectionMetadata["SelectionMethod"]);
         Assert.Equal("FanOut", result.SelectionMetadata["StrategyType"]);
-        
+
         var providerIds = (List<string>)result.SelectionMetadata["ProviderIds"];
         Assert.Equal(2, providerIds.Count);
         Assert.All(providerIds, id => Assert.StartsWith("test-provider-", id));
@@ -585,11 +585,11 @@ public class SelectionStrategyTests
         };
 
         var context1 = new SelectionContext<ITestSelectionService>(
-            registrations, 
+            registrations,
             new Dictionary<string, object> { ["EventName"] = "player.level.complete" });
-        
+
         var context2 = new SelectionContext<ITestSelectionService>(
-            registrations, 
+            registrations,
             new Dictionary<string, object> { ["EventName"] = "game.session.start" });
 
         var strategy = DefaultSelectionStrategies.CreateAnalyticsSharded<ITestSelectionService>();
@@ -603,7 +603,7 @@ public class SelectionStrategyTests
         Assert.Single(result2.SelectedProviders);
         Assert.Equal("player", result1.SelectionMetadata!["ShardKey"]);
         Assert.Equal("game", result2.SelectionMetadata!["ShardKey"]);
-        
+
         // Different shard keys may select different providers (this is probabilistic)
         // but each should be consistent
         Assert.Equal(SelectionStrategyType.Sharded, result1.StrategyType);
@@ -770,7 +770,7 @@ public class SelectionStrategyTests
         };
 
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => 
+        var exception = Assert.Throws<ArgumentException>(() =>
             DefaultSelectionStrategies.ExtractAnalyticsShardKey(metadata));
         Assert.Contains("requires metadata with EventName or ShardKey", exception.Message);
     }
@@ -788,8 +788,8 @@ public class SelectionStrategyTests
     }
 
     private static IProviderRegistration CreateRegistration(
-        ITestSelectionService provider, 
-        Priority priority, 
+        ITestSelectionService provider,
+        Priority priority,
         DateTime registeredAt)
     {
         var capabilities = new ProviderCapabilities
@@ -810,8 +810,8 @@ public class SelectionStrategyTests
     }
 
     private static IProviderRegistration CreateRegistrationWithTags(
-        ITestSelectionService provider, 
-        Priority priority, 
+        ITestSelectionService provider,
+        Priority priority,
         DateTime registeredAt,
         params string[] tags)
     {
@@ -833,8 +833,8 @@ public class SelectionStrategyTests
     }
 
     private static IProviderRegistration CreateActiveRegistration(
-        ITestSelectionService provider, 
-        Priority priority, 
+        ITestSelectionService provider,
+        Priority priority,
         DateTime registeredAt,
         bool isActive)
     {

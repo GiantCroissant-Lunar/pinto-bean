@@ -32,13 +32,13 @@ using Yokan.PintoBean.CodeGen;
 
 namespace Yokan.PintoBean.Contracts;
 
-public interface ITestService 
+public interface ITestService
 {
     void DoSomething();
 }
 
 [RealizeService(typeof(ITestService))]
-public partial class TestService 
+public partial class TestService
 {
     public void DoSomething() { }
 }";
@@ -63,13 +63,13 @@ using Yokan.PintoBean.CodeGen;
 namespace Yokan.PintoBean.Facades;
 
 [GenerateRegistry(typeof(ITestService))]
-public interface ITestService 
+public interface ITestService
 {
     void DoSomething();
 }
 
 [RealizeService(typeof(ITestService))]
-public partial class TestService 
+public partial class TestService
 {
     public void DoSomething() { }
 }";
@@ -94,7 +94,7 @@ using Yokan.PintoBean.CodeGen;
 namespace Yokan.PintoBean.Facades;
 
 [RealizeService()]
-public partial class TestService 
+public partial class TestService
 {
 }";
 
@@ -118,13 +118,13 @@ using Yokan.PintoBean.CodeGen;
 namespace Yokan.PintoBean.Facades;
 
 [GenerateRegistry(typeof(ITestService))]
-public interface ITestService 
+public interface ITestService
 {
     void DoSomething();
 }
 
 [RealizeService(typeof(ITestService))]
-public partial class TestService 
+public partial class TestService
 {
     public void DoSomething() { }
 }";
@@ -148,13 +148,13 @@ using Yokan.PintoBean.CodeGen;
 
 namespace Yokan.PintoBean.Facades;
 
-public interface ITestService 
+public interface ITestService
 {
     void DoSomething();
 }
 
 [RealizeService(typeof(ITestService))]
-public partial class TestService 
+public partial class TestService
 {
     public void DoSomething() { }
 }";
@@ -179,13 +179,13 @@ using Yokan.PintoBean.CodeGen;
 namespace Yokan.PintoBean.Facades;
 
 [GenerateRegistry(typeof(ITestService))]
-public interface ITestService 
+public interface ITestService
 {
     void DoSomething();
 }
 
 [RealizeService(typeof(ITestService))]
-public partial class TestService 
+public partial class TestService
 {
     public void DoSomething() { }
 }";
@@ -210,19 +210,19 @@ using Yokan.PintoBean.CodeGen;
 namespace Yokan.PintoBean.Facades;
 
 [GenerateRegistry(typeof(IUserService))]
-public interface IUserService 
+public interface IUserService
 {
     void CreateUser();
 }
 
 [GenerateRegistry(typeof(IAccountService))]
-public interface IAccountService 
+public interface IAccountService
 {
     void CreateAccount();
 }
 
 [RealizeService(typeof(IUserService), typeof(IAccountService))]
-public partial class UserManagementService 
+public partial class UserManagementService
 {
     public void CreateUser() { }
     public void CreateAccount() { }
@@ -244,19 +244,19 @@ using Yokan.PintoBean.CodeGen;
 namespace Yokan.PintoBean.Facades;
 
 [GenerateRegistry(typeof(IUserService))]
-public interface IUserService 
+public interface IUserService
 {
     void CreateUser();
 }
 
 [GenerateRegistry(typeof(IOrderService))]
-public interface IOrderService 
+public interface IOrderService
 {
     void CreateOrder();
 }
 
 [RealizeService(typeof(IUserService), typeof(IOrderService))]
-public partial class MixedService 
+public partial class MixedService
 {
     public void CreateUser() { }
     public void CreateOrder() { }
@@ -305,27 +305,27 @@ public partial class MixedService
         {
             var compilation = CreateCompilation(_source, _assemblyName);
             var analyzer = new PintoBeanAnalyzer();
-            
+
             var compilationWithAnalyzers = compilation.WithAnalyzers(
                 ImmutableArray.Create<DiagnosticAnalyzer>(analyzer),
                 new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty));
 
             var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-            
+
             VerifyDiagnostics(diagnostics, _expected);
         }
 
         private static Compilation CreateCompilation(string source, string assemblyName)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source);
-            
+
             // Get the path to the CodeGen assembly that contains RealizeServiceAttribute
 #pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
             var codeGenAssemblyPath = Path.Combine(
                 Path.GetDirectoryName(typeof(PintoBeanAnalyzerTests).Assembly.Location)!,
                 "Yokan.PintoBean.CodeGen.dll");
 #pragma warning restore IL3000
-            
+
             var references = new List<MetadataReference>
             {
 #pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
@@ -333,7 +333,7 @@ public partial class MixedService
                 MetadataReference.CreateFromFile(typeof(System.Attribute).Assembly.Location), // System.Runtime
 #pragma warning restore IL3000
             };
-            
+
             // Add CodeGen reference if the assembly exists
             if (File.Exists(codeGenAssemblyPath))
             {
@@ -386,12 +386,12 @@ public partial class MixedService
 
             // Filter to only SG000x diagnostics for our analyzer
             var filteredDiagnostics = actualDiagnostics.Where(d => d.Id.StartsWith("SG000")).ToImmutableArray();
-            
+
             if (expectedCount != filteredDiagnostics.Length)
             {
                 var actualDiagnosticMessages = string.Join(", ", filteredDiagnostics.Select(d => d.Id + ": " + d.GetMessage()));
                 var allDiagnosticMessages = string.Join(", ", actualDiagnostics.Select(d => d.Id + ": " + d.GetMessage()));
-                Assert.True(false, 
+                Assert.True(false,
                     $"Expected {expectedCount} SG000x diagnostics but got {filteredDiagnostics.Length}. " +
                     $"Actual SG000x diagnostics: {actualDiagnosticMessages}. " +
                     $"All diagnostics: {allDiagnosticMessages}");
@@ -404,7 +404,7 @@ public partial class MixedService
 
                 Assert.Equal(expected.Id, actual.Id);
                 Assert.Equal(expected.Severity, actual.Severity);
-                
+
                 if (!string.IsNullOrEmpty(expected.Message))
                 {
                     Assert.Equal(expected.Message, actual.GetMessage());
@@ -414,7 +414,7 @@ public partial class MixedService
                 {
                     var actualSpan = actual.Location.GetLineSpan();
                     var expectedSpan = expected.Spans.First();
-                    
+
                     Assert.Equal(expectedSpan.StartLine, actualSpan.StartLinePosition.Line + 1);
                     Assert.Equal(expectedSpan.StartColumn, actualSpan.StartLinePosition.Character + 1);
                     Assert.Equal(expectedSpan.EndLine, actualSpan.EndLinePosition.Line + 1);
@@ -436,17 +436,17 @@ internal class DiagnosticResult
     /// Gets or sets the diagnostic ID.
     /// </summary>
     public string Id { get; set; } = "";
-    
+
     /// <summary>
     /// Gets or sets the diagnostic severity.
     /// </summary>
     public DiagnosticSeverity Severity { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the diagnostic message.
     /// </summary>
     public string Message { get; set; } = "";
-    
+
     /// <summary>
     /// Gets or sets the spans where the diagnostic should occur.
     /// </summary>
@@ -515,17 +515,17 @@ internal class DiagnosticResultLocation
     /// Gets the start line (1-based).
     /// </summary>
     public int StartLine { get; }
-    
+
     /// <summary>
     /// Gets the start column (1-based).
     /// </summary>
     public int StartColumn { get; }
-    
+
     /// <summary>
     /// Gets the end line (1-based).
     /// </summary>
     public int EndLine { get; }
-    
+
     /// <summary>
     /// Gets the end column (1-based).
     /// </summary>

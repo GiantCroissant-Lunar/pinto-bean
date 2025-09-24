@@ -135,10 +135,10 @@ public class ProviderSelectionCacheTests
 
         // Act
         cache.Set(context, result);
-        
+
         // Wait for expiration
         Thread.Sleep(50);
-        
+
         var resultAfterExpiry = cache.TryGet(context);
 
         // Assert
@@ -377,7 +377,7 @@ public class ProviderSelectionCacheTests
     public void SelectionContextHashHelper_GetHashCode_NullContext_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             SelectionContextHashHelper.GetHashCode<ITestSelectionService>(null!));
     }
 
@@ -386,13 +386,13 @@ public class ProviderSelectionCacheTests
         var provider = new TestSelectionService(providerId ?? "TestProvider");
         var registration = CreateRegistration(provider, Priority.Normal, DateTime.UtcNow, providerId);
         var registrations = new List<IProviderRegistration> { registration };
-        
+
         return new SelectionContext<ITestSelectionService>(registrations);
     }
 
     private static IProviderRegistration CreateRegistration(
-        ITestSelectionService provider, 
-        Priority priority, 
+        ITestSelectionService provider,
+        Priority priority,
         DateTime registeredAt,
         string? providerId = null)
     {

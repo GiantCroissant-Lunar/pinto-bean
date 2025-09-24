@@ -71,10 +71,10 @@ public class RealizeServiceAttributeTests
     {
         // Arrange
         var attributeType = typeof(RealizeServiceAttribute);
-        
+
         // Act
         var usage = (AttributeUsageAttribute)Attribute.GetCustomAttribute(attributeType, typeof(AttributeUsageAttribute))!;
-        
+
         // Assert
         Assert.NotNull(usage);
         Assert.Equal(AttributeTargets.Class, usage.ValidOn);
@@ -94,7 +94,7 @@ public class RealizeServiceAttributeTests
 
         // Act & Assert - Property should be read-only (no setter)
         Assert.Equal(contracts, attribute.Contracts);
-        
+
         // Verify the property is indeed read-only
         var property = typeof(RealizeServiceAttribute).GetProperty(nameof(RealizeServiceAttribute.Contracts));
         Assert.NotNull(property);

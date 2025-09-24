@@ -135,7 +135,7 @@ public sealed class ServiceRegistry : IServiceRegistry
             return 0;
 
         var count = serviceProviders.Count;
-        
+
         // Raise events for each removed provider
         foreach (var registration in serviceProviders.Values)
         {
@@ -245,7 +245,7 @@ internal sealed class TypedServiceRegistry<TService> : IServiceRegistry<TService
         var registrations = GetRegistrations().ToList();
         var context = new SelectionContext<TService>(registrations);
         var result = _selectionStrategy.SelectProviders(context);
-        
+
         // For backward compatibility, return the first selected provider
         // This maintains the existing behavior for PickOne strategy
         return result.SelectedProviders.First();

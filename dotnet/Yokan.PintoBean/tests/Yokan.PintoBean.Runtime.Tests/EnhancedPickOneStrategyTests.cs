@@ -9,7 +9,7 @@ using Yokan.PintoBean.Runtime;
 namespace Yokan.PintoBean.Runtime.Tests;
 
 /// <summary>
-/// Tests for the enhanced PickOne strategy with capability filtering, platform filtering, 
+/// Tests for the enhanced PickOne strategy with capability filtering, platform filtering,
 /// deterministic tie-break, and TTL cache.
 /// </summary>
 public class EnhancedPickOneStrategyTests
@@ -154,7 +154,7 @@ public class EnhancedPickOneStrategyTests
 
         // Assert - All results should be the same (deterministic)
         Assert.True(results.All(r => r == results[0]), "Selection should be deterministic");
-        
+
         // The selection should be based on stable hash, not alphabetical or registration order
         // We can't predict which one will be selected, but it should be consistent
     }
@@ -185,7 +185,7 @@ public class EnhancedPickOneStrategyTests
         Assert.Single(result.SelectedProviders);
         // Should select either the current platform-specific provider or the "Any" provider
         var selectedName = result.SelectedProviders.First().GetName();
-        Assert.True(selectedName == "Any" || selectedName == "Unity" || selectedName == "Web", 
+        Assert.True(selectedName == "Any" || selectedName == "Unity" || selectedName == "Web",
             $"Selected provider should be platform-compatible, got: {selectedName}");
     }
 
@@ -230,12 +230,12 @@ public class EnhancedPickOneStrategyTests
 
         // Act - First call should cache
         var result1 = strategy.SelectProviders(context);
-        
+
         // Register new provider (this should invalidate cache)
         var registration2 = registry.Register<IEnhancedTestService>(provider2, ProviderCapabilities.Create("test-2").WithPriority(Priority.High));
         var updatedRegistrations = registry.GetRegistrations<IEnhancedTestService>().ToList();
         var updatedContext = new SelectionContext<IEnhancedTestService>(updatedRegistrations);
-        
+
         // Second call should use new selection (not cached)
         var result2 = strategy.SelectProviders(updatedContext);
 
@@ -260,10 +260,10 @@ public class EnhancedPickOneStrategyTests
 
         // Act - First call should compute and cache
         var result1 = strategy.SelectProviders(context);
-        
+
         // Wait for cache to expire
         Task.Delay(100).Wait();
-        
+
         // Second call should recompute (cache expired)
         var result2 = strategy.SelectProviders(context);
 

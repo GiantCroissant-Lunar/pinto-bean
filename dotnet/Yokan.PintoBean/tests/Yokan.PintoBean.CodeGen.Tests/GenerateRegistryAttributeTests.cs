@@ -74,10 +74,10 @@ public class GenerateRegistryAttributeTests
     {
         // Arrange
         var attributeType = typeof(GenerateRegistryAttribute);
-        
+
         // Act
         var usage = (AttributeUsageAttribute)Attribute.GetCustomAttribute(attributeType, typeof(AttributeUsageAttribute))!;
-        
+
         // Assert
         Assert.NotNull(usage);
         Assert.Equal(AttributeTargets.Interface | AttributeTargets.Class, usage.ValidOn);
@@ -97,7 +97,7 @@ public class GenerateRegistryAttributeTests
 
         // Act & Assert - Property should be read-only (no setter)
         Assert.Equal(contract, attribute.Contract);
-        
+
         // Verify the property is indeed read-only
         var property = typeof(GenerateRegistryAttribute).GetProperty(nameof(GenerateRegistryAttribute.Contract));
         Assert.NotNull(property);

@@ -33,7 +33,7 @@ public sealed class DefaultSelectionStrategyFactory : ISelectionStrategyFactory
     public ISelectionStrategy<TService> CreateStrategy<TService>() where TService : class
     {
         var serviceType = typeof(TService);
-        
+
         // Check for custom strategy factory first
         var customFactory = _options.GetCustomStrategyFactory(serviceType);
         if (customFactory != null)
@@ -102,7 +102,7 @@ public sealed class DefaultSelectionStrategyFactory : ISelectionStrategyFactory
         var namespaceName = serviceType.Namespace?.ToLowerInvariant() ?? string.Empty;
 
         // Check for analytics keywords
-        if (typeName.Contains("analytics") || typeName.Contains("telemetry") || 
+        if (typeName.Contains("analytics") || typeName.Contains("telemetry") ||
             typeName.Contains("tracking") || typeName.Contains("metrics") ||
             namespaceName.Contains("analytics") || namespaceName.Contains("telemetry"))
         {
@@ -110,7 +110,7 @@ public sealed class DefaultSelectionStrategyFactory : ISelectionStrategyFactory
         }
 
         // Check for AI keywords
-        if (typeName.Contains("ai") || typeName.Contains("intelligence") || 
+        if (typeName.Contains("ai") || typeName.Contains("intelligence") ||
             typeName.Contains("ml") || typeName.Contains("machinelearning") ||
             namespaceName.Contains("ai") || namespaceName.Contains("intelligence"))
         {
@@ -118,7 +118,7 @@ public sealed class DefaultSelectionStrategyFactory : ISelectionStrategyFactory
         }
 
         // Check for scene flow keywords
-        if (typeName.Contains("scene") || typeName.Contains("flow") || 
+        if (typeName.Contains("scene") || typeName.Contains("flow") ||
             typeName.Contains("narrative") || typeName.Contains("story") ||
             namespaceName.Contains("scene") || namespaceName.Contains("flow"))
         {
@@ -126,7 +126,7 @@ public sealed class DefaultSelectionStrategyFactory : ISelectionStrategyFactory
         }
 
         // Check for resource keywords
-        if (typeName.Contains("resource") || typeName.Contains("data") || 
+        if (typeName.Contains("resource") || typeName.Contains("data") ||
             typeName.Contains("repository") || typeName.Contains("storage") ||
             namespaceName.Contains("resource") || namespaceName.Contains("data"))
         {
@@ -148,7 +148,7 @@ public sealed class DefaultSelectionStrategyFactory : ISelectionStrategyFactory
         public TypeErasedSelectionStrategy(Type serviceType, DefaultSelectionStrategyFactory factory)
         {
             ServiceType = serviceType;
-            
+
             // Determine strategy type based on configuration
             var strategyOverride = factory._options.GetStrategyOverride(serviceType);
             StrategyType = strategyOverride ?? factory.GetDefaultStrategyForService(serviceType);

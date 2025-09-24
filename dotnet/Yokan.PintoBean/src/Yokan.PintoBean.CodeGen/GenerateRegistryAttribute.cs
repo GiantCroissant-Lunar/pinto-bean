@@ -20,7 +20,7 @@ namespace Yokan.PintoBean.CodeGen;
 /// <item><description>DI extensions for registering providers and configuring strategies (PickOne, FanOut, Sharded when enabled)</description></item>
 /// </list>
 /// <para>
-/// The generated registry scaffolding enables type-safe provider registration and 
+/// The generated registry scaffolding enables type-safe provider registration and
 /// strategy selection at both design-time and runtime.
 /// </para>
 /// </remarks>
