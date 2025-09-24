@@ -10,6 +10,12 @@ This directory contains architectural decision documents and proposals for the Y
 | [RFC-0002](rfc-0002-codegen-and-consumption.md) | Code Generation & Consumption (Façades, Registry, Packaging) | Draft | Source generator attributes, outputs, diagnostics, and Unity/Godot/.NET consumption patterns |
 | [RFC-0003](rfc-0003-selection-strategies.md) | Selection Strategies (PickOne, FanOut, Sharded) & Category Defaults | Draft | Standard selection strategies for provider selection with category defaults and override points |
 
+## Quickstart Guides
+
+| Guide | Description |
+|-------|-------------|
+| [Selection Strategies Quickstart](../selection-strategies-quickstart.md) | Practical guide for implementing PickOne, FanOut, and Sharded strategies with DI configuration examples |
+
 ## RFC Process
 
 RFCs follow the standard process:
