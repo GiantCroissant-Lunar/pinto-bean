@@ -2,16 +2,15 @@
 name: Pre-Commit (Docker - Fast)
 
 'on':
-  # Temporarily disabled due to Docker image permissions issues
-  # pull_request:
-  #   branches: [main]
-  # push:
-  #   branches: [main]
-  #   paths:
-  #     - '.pre-commit-config.yaml'
-  #     - 'scripts/**'
-  #     - 'tools/**'
-  #     - '.github/workflows/pre-commit-docker.yml'
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - '.pre-commit-config.yaml'
+      - 'scripts/**'
+      - 'tools/**'
+      - '.github/workflows/pre-commit-docker.yml'
   workflow_dispatch: {}
 
 permissions:
@@ -24,9 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/giantcroissant-lunar/pinto-bean/precommit:latest
-      credentials:
-        username: giantcroissant-lunar
-        password: ${{ secrets.GITHUB_TOKEN }}
+      # No credentials needed for public images
     timeout-minutes: 15
     steps:
       - name: Checkout
