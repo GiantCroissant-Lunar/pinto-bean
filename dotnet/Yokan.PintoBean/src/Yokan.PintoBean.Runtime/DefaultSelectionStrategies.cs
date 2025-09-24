@@ -257,6 +257,7 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
     private readonly IServiceRegistry? _registry;
     private readonly IResilienceExecutor? _resilienceExecutor;
     private readonly IAspectRuntime _aspectRuntime;
+    private readonly FanOutErrorPolicy _errorPolicy;
     private bool _disposed;
 
     /// <summary>
@@ -265,11 +266,13 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
     /// <param name="registry">Optional service registry for provider change monitoring.</param>
     /// <param name="resilienceExecutor">Optional resilience executor for fault handling.</param>
     /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
-    public FanOutSelectionStrategy(IServiceRegistry? registry = null, IResilienceExecutor? resilienceExecutor = null, IAspectRuntime? aspectRuntime = null)
+    /// <param name="errorPolicy">Error handling policy for aggregation. Defaults to Continue.</param>
+    public FanOutSelectionStrategy(IServiceRegistry? registry = null, IResilienceExecutor? resilienceExecutor = null, IAspectRuntime? aspectRuntime = null, FanOutErrorPolicy errorPolicy = FanOutErrorPolicy.Continue)
     {
         _registry = registry;
         _resilienceExecutor = resilienceExecutor;
         _aspectRuntime = aspectRuntime ?? NoOpAspectRuntime.Instance;
+        _errorPolicy = errorPolicy;
     }
 
     /// <inheritdoc />
@@ -329,7 +332,8 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
                 ["ProviderCount"] = selectedProviders.Count,
                 ["ProviderIds"] = compatibleProviders.Select(r => r.Capabilities.ProviderId).ToList(),
                 ["SelectionMethod"] = "FanOut (all compatible providers)",
-                ["StrategyType"] = "FanOut"
+                ["StrategyType"] = "FanOut",
+                ["ErrorPolicy"] = _errorPolicy.ToString()
             };
 
             return new SelectionResult<TService>(
@@ -709,14 +713,16 @@ public static class DefaultSelectionStrategies
     /// <param name="registry">Optional service registry for provider change monitoring.</param>
     /// <param name="resilienceExecutor">Optional resilience executor for fault handling.</param>
     /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
+    /// <param name="errorPolicy">Error handling policy for aggregation. Defaults to Continue.</param>
     /// <returns>A FanOut selection strategy instance.</returns>
     public static ISelectionStrategy<TService> CreateFanOut<TService>(
         IServiceRegistry? registry = null,
         IResilienceExecutor? resilienceExecutor = null,
-        IAspectRuntime? aspectRuntime = null)
+        IAspectRuntime? aspectRuntime = null,
+        FanOutErrorPolicy errorPolicy = FanOutErrorPolicy.Continue)
         where TService : class
     {
-        return new FanOutSelectionStrategy<TService>(registry, resilienceExecutor, aspectRuntime);
+        return new FanOutSelectionStrategy<TService>(registry, resilienceExecutor, aspectRuntime, errorPolicy);
     }
     /// <summary>
     /// Creates a default Sharded strategy for the specified service type with analytics shard key extraction.
