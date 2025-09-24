@@ -132,6 +132,10 @@ dotnet run --project samples/PintoBean.Hello.Demo.Console
 
 See [RFCs](docs/rfcs/) for detailed architecture documentation.
 
+### Quick Start Guides
+
+- **[Selection Strategies Quickstart](docs/selection-strategies-quickstart.md)** - Learn how to configure PickOne, FanOut, and Sharded strategies with DI
+
 ## Next Steps
 
 1. Populate & encrypt `terraform.json` (ensure TFC_TOKEN present) and commit only the encrypted file.
