@@ -16,7 +16,7 @@ namespace Yokan.PintoBean.Runtime;
 public sealed class PickOneSelectionStrategy<TService> : ISelectionStrategy<TService>, ISelectionStrategy, IDisposable
     where TService : class
 {
-    private readonly SelectionCache<TService> _cache;
+    private readonly IProviderSelectionCache<TService> _cache;
     private readonly IServiceRegistry? _registry;
     private bool _disposed;
 
@@ -209,6 +209,13 @@ public sealed class PickOneSelectionStrategy<TService> : ISelectionStrategy<TSer
             {
                 _registry.ProviderChanged -= OnProviderChanged;
             }
+            
+            // Dispose the cache if it implements IDisposable
+            if (_cache is IDisposable disposableCache)
+            {
+                disposableCache.Dispose();
+            }
+            
             _disposed = true;
         }
     }
@@ -363,7 +370,7 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
 public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TService>, ISelectionStrategy, IDisposable
     where TService : class
 {
-    private readonly SelectionCache<TService> _cache;
+    private readonly IProviderSelectionCache<TService> _cache;
     private readonly IServiceRegistry? _registry;
     private readonly Func<IDictionary<string, object>?, string> _keyExtractor;
     private bool _disposed;
@@ -588,6 +595,13 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
             {
                 _registry.ProviderChanged -= OnProviderChanged;
             }
+            
+            // Dispose the cache if it implements IDisposable
+            if (_cache is IDisposable disposableCache)
+            {
+                disposableCache.Dispose();
+            }
+            
             _disposed = true;
         }
     }
