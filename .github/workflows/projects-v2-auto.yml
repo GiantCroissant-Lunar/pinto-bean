@@ -1,0 +1,190 @@
+name: GitHub Projects v2 Auto Management
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'list-projects'
+        type: choice
+        options:
+        - list-projects
+        - add-existing-issue-to-project
+      project_number:
+        description: 'Project number (default: 3)'
+        required: false
+        type: string
+        default: '3'
+      issue_number:
+        description: 'Issue number (for add-existing-issue-to-project)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  projects-auto:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Auto-add new issue to project
+      if: github.event_name == 'issues' && github.event.action == 'opened'
+      env:
+        GH_TOKEN: ${{ secrets.USE_PROJECT_V2_TOKEN }}
+      run: |
+        echo "New issue #${{ github.event.issue.number }} created, adding to project..."
+
+        PROJECT_NUMBER=3
+        ISSUE_NUMBER=${{ github.event.issue.number }}
+
+        echo "Getting project ID for project number: $PROJECT_NUMBER"
+        PROJECT_ID=$(gh api graphql -f query='
+        query($login: String!) {
+          user(login: $login) {
+            projectV2(number: '$PROJECT_NUMBER') {
+              id
+            }
+          }
+        }' -f login=${{ github.repository_owner }} --jq '.data.user.projectV2.id')
+
+        echo "Project ID: $PROJECT_ID"
+
+        echo "Getting issue ID for issue number: $ISSUE_NUMBER"
+        ISSUE_ID=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER --jq '.node_id')
+
+        echo "Issue ID: $ISSUE_ID"
+
+        echo "Adding issue to project..."
+        gh api graphql -f query='
+        mutation($projectId: ID!, $contentId: ID!) {
+          addProjectV2ItemById(input: {
+            projectId: $projectId
+            contentId: $contentId
+          }) {
+            item {
+              id
+            }
+          }
+        }' -f projectId="$PROJECT_ID" -f contentId="$ISSUE_ID"
+
+        echo "Issue #$ISSUE_NUMBER added to Project #$PROJECT_NUMBER"
+
+    - name: List Projects v2
+      if: github.event.inputs.action == 'list-projects'
+      run: |
+        echo "Listing Projects v2 for user..."
+        gh api graphql -f query='
+        {
+          viewer {
+            projectsV2(first: 10) {
+              nodes {
+                id
+                number
+                title
+                url
+                public
+                closed
+              }
+            }
+          }
+        }' --jq '.data.viewer.projectsV2.nodes[] | "Project #\(.number): \(.title) - \(.url) (Public: \(.public))"'
+      env:
+        GITHUB_TOKEN: ${{ secrets.USE_PROJECT_V2_TOKEN }}
+
+    - name: Add Existing Issue to Project
+      if: github.event.inputs.action == 'add-existing-issue-to-project' && github.event.inputs.issue_number != ''
+      run: |
+        PROJECT_NUMBER=${{ github.event.inputs.project_number }}
+        ISSUE_NUMBER=${{ github.event.inputs.issue_number }}
+
+        echo "Adding existing repository issue #$ISSUE_NUMBER to project #$PROJECT_NUMBER..."
+
+        # Find the project ID
+        PROJECT_DATA=$(gh api graphql -f query='
+        {
+          viewer {
+            projectsV2(first: 10) {
+              nodes {
+                id
+                number
+                title
+                url
+              }
+            }
+          }
+        }' --jq '.data.viewer.projectsV2.nodes[] | select(.number == '$PROJECT_NUMBER')')
+
+        if [ -z "$PROJECT_DATA" ]; then
+          echo "Project #$PROJECT_NUMBER not found"
+          exit 1
+        fi
+
+        PROJECT_ID=$(echo "$PROJECT_DATA" | jq -r '.id')
+        PROJECT_TITLE=$(echo "$PROJECT_DATA" | jq -r '.title')
+
+        echo "Target Project: $PROJECT_TITLE"
+
+        # Get the existing issue details
+        ISSUE_DATA=$(gh api graphql -f query="
+        {
+          repository(owner: \"${{ github.repository_owner }}\", name: \"${{ github.event.repository.name }}\") {
+            issue(number: $ISSUE_NUMBER) {
+              id
+              title
+              url
+              state
+            }
+          }
+        }" --jq '.data.repository.issue')
+
+        if [ -z "$ISSUE_DATA" ] || [ "$ISSUE_DATA" = "null" ]; then
+          echo "Issue #$ISSUE_NUMBER not found"
+          exit 1
+        fi
+
+        ISSUE_NODE_ID=$(echo "$ISSUE_DATA" | jq -r '.id')
+        ISSUE_TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
+        ISSUE_URL=$(echo "$ISSUE_DATA" | jq -r '.url')
+
+        echo "Issue: $ISSUE_TITLE"
+        echo "Issue URL: $ISSUE_URL"
+
+        # Add the issue to the project
+        gh api graphql -f query="
+        mutation {
+          addProjectV2ItemById(input: {
+            projectId: \"$PROJECT_ID\"
+            contentId: \"$ISSUE_NODE_ID\"
+          }) {
+            item {
+              id
+              content {
+                ... on Issue {
+                  title
+                  number
+                }
+              }
+            }
+          }
+        }" --jq '.data.addProjectV2ItemById.item | "Added to project: \(.content.title) (#\(.content.number))"'
+
+        echo "Issue #$ISSUE_NUMBER added to Project #$PROJECT_NUMBER"
+      env:
+        GITHUB_TOKEN: ${{ secrets.USE_PROJECT_V2_TOKEN }}
+
+    - name: Display Results Summary
+      run: |
+        echo "## Projects v2 Auto Management Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Action performed:** ${{ github.event.inputs.action || 'auto-add-issue' }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Project:** https://github.com/users/${{ github.repository_owner }}/projects/3" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
