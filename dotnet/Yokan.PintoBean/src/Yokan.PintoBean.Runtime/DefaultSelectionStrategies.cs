@@ -300,9 +300,10 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
         // Step 1: Apply capability filter (filter by tags if specified in metadata)
         candidates = ApplyCapabilityFilter(candidates, context.Metadata);
 
-        // Step 2: Platform filter (ensure platform compatibility)
+        // Step 2: Apply platform filter (ensure platform compatibility)
         candidates = ApplyPlatformFilter(candidates);
 
+        // Step 3: Only return active providers
         return candidates.Where(r => r.IsActive);
     }
 
@@ -626,7 +627,6 @@ public static class DefaultSelectionStrategies
     {
         return new FanOutSelectionStrategy<TService>(registry, resilienceExecutor);
     }
-
     /// <summary>
     /// Creates a default Sharded strategy for the specified service type with analytics shard key extraction.
     /// </summary>

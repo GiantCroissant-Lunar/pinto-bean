@@ -46,9 +46,19 @@ jobs:
 
       - name: Configure git (required for pre-commit)
         run: |
-          git config --global --add safe.directory /github/workspace
+          git config --global --add safe.directory ${{ github.workspace }}
+          git config --global --add safe.directory /__w/pinto-bean/pinto-bean
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
+
+      - name: Verify pre-commit installation
+        run: |
+          echo "=== Verifying pre-commit is working ==="
+          which pre-commit
+          python -c "import pre_commit; print('pre-commit module imported successfully')"
+          echo "=== Git repository status ==="
+          pwd
+          git status --porcelain || echo "Git status failed"
 
       - name: Run pre-commit (changed files fast path)
         run: pre-commit run --show-diff-on-failure --color=always

@@ -65,6 +65,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: |
+            CACHE_BUST=${{ inputs.force_rebuild == true && github.run_id || 'default' }}
+          cache-from: ${{ inputs.force_rebuild != true && 'type=gha' || '' }}
+          cache-to: ${{ inputs.force_rebuild != true && 'type=gha,mode=max' || '' }}
+          no-cache: ${{ inputs.force_rebuild == true }}
           platforms: linux/amd64
