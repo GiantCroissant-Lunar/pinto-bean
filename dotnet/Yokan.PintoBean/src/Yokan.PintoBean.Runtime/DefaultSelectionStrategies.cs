@@ -311,7 +311,7 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
     /// Applies capability filtering based on required tags in selection metadata.
     /// </summary>
     private static IEnumerable<IProviderRegistration> ApplyCapabilityFilter(
-        IEnumerable<IProviderRegistration> candidates, 
+        IEnumerable<IProviderRegistration> candidates,
         IDictionary<string, object>? metadata)
     {
         if (metadata == null || !metadata.TryGetValue("RequiredTags", out var tagsObj))
@@ -356,6 +356,244 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
 }
 
 /// <summary>
+/// Default Sharded selection strategy that routes requests by key using a key extraction function.
+/// Commonly used for analytics with event name prefix routing.
+/// </summary>
+/// <typeparam name="TService">The service contract type.</typeparam>
+public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TService>, ISelectionStrategy, IDisposable
+    where TService : class
+{
+    private readonly SelectionCache<TService> _cache;
+    private readonly IServiceRegistry? _registry;
+    private readonly Func<IDictionary<string, object>?, string> _keyExtractor;
+    private bool _disposed;
+
+    /// <summary>
+    /// Initializes a new instance of the ShardedSelectionStrategy class.
+    /// </summary>
+    /// <param name="keyExtractor">Function to extract shard key from selection metadata.</param>
+    /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
+    /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    public ShardedSelectionStrategy(
+        Func<IDictionary<string, object>?, string> keyExtractor,
+        IServiceRegistry? registry = null, 
+        TimeSpan? cacheTtl = null)
+    {
+        _keyExtractor = keyExtractor ?? throw new ArgumentNullException(nameof(keyExtractor));
+        _cache = new SelectionCache<TService>(cacheTtl);
+        _registry = registry;
+
+        // Subscribe to provider changes for cache invalidation
+        if (_registry != null)
+        {
+            _registry.ProviderChanged += OnProviderChanged;
+        }
+    }
+
+    /// <inheritdoc />
+    public SelectionStrategyType StrategyType => SelectionStrategyType.Sharded;
+
+    /// <inheritdoc />
+    public Type ServiceType => typeof(TService);
+
+    /// <inheritdoc />
+    public ISelectionResult<TService> SelectProviders(ISelectionContext<TService> context)
+    {
+        if (context == null)
+            throw new ArgumentNullException(nameof(context));
+
+        if (context.Registrations.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No providers registered for service contract '{typeof(TService).Name}'.");
+        }
+
+        // Extract shard key
+        var shardKey = _keyExtractor(context.Metadata);
+        if (string.IsNullOrEmpty(shardKey))
+        {
+            throw new InvalidOperationException("Shard key extraction returned null or empty string.");
+        }
+
+        // Try cache first (including shard key in cache context)
+        var cachedResult = _cache.TryGet(context);
+        if (cachedResult != null)
+        {
+            return cachedResult;
+        }
+
+        // Apply filtering and shard-based selection
+        var selected = SelectProviderByShard(context, shardKey);
+        var selectedProvider = (TService)selected.Provider;
+
+        var result = SelectionResult<TService>.Single(
+            selectedProvider,
+            SelectionStrategyType.Sharded,
+            new Dictionary<string, object>
+            {
+                ["ShardKey"] = shardKey,
+                ["Priority"] = selected.Capabilities.Priority,
+                ["RegisteredAt"] = selected.Capabilities.RegisteredAt,
+                ["ProviderId"] = selected.Capabilities.ProviderId,
+                ["Platform"] = selected.Capabilities.Platform,
+                ["Tags"] = selected.Capabilities.Tags.ToList(),
+                ["SelectionMethod"] = "Sharded routing"
+            });
+
+        // Cache the result
+        _cache.Set(context, result);
+
+        return result;
+    }
+
+    /// <inheritdoc />
+    public bool CanHandle(ISelectionContext<TService> context)
+    {
+        // Sharded strategy can handle any context with at least one registration
+        // and where key extraction doesn't fail
+        if (context?.Registrations?.Count == 0)
+            return false;
+
+        try
+        {
+            var shardKey = _keyExtractor(context?.Metadata);
+            return !string.IsNullOrEmpty(shardKey);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Selects a provider based on shard key routing with consistent hashing.
+    /// </summary>
+    private static IProviderRegistration SelectProviderByShard(ISelectionContext<TService> context, string shardKey)
+    {
+        var candidates = context.Registrations.AsEnumerable();
+
+        // Step 1: Capability filter (filter by tags if specified in metadata)
+        candidates = ApplyCapabilityFilter(candidates, context.Metadata);
+
+        // Step 2: Platform filter (ensure platform compatibility)
+        candidates = ApplyPlatformFilter(candidates);
+
+        var candidateList = candidates.ToList();
+        if (candidateList.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No compatible providers found for service contract '{typeof(TService).Name}' after applying filters.");
+        }
+
+        // Step 3: Consistent hashing based on shard key
+        return SelectByConsistentHashing(candidateList, shardKey);
+    }
+
+    /// <summary>
+    /// Applies capability filtering based on required tags in selection metadata.
+    /// </summary>
+    private static IEnumerable<IProviderRegistration> ApplyCapabilityFilter(
+        IEnumerable<IProviderRegistration> candidates, 
+        IDictionary<string, object>? metadata)
+    {
+        if (metadata == null || !metadata.TryGetValue("RequiredTags", out var tagsObj))
+        {
+            return candidates; // No capability filter specified
+        }
+
+        var requiredTags = tagsObj switch
+        {
+            string[] stringArray => stringArray,
+            IEnumerable<string> enumerable => enumerable.ToArray(),
+            string singleTag => new[] { singleTag },
+            _ => Array.Empty<string>()
+        };
+
+        if (requiredTags.Length == 0)
+        {
+            return candidates;
+        }
+
+        return candidates.Where(r => r.Capabilities.HasTags(requiredTags));
+    }
+
+    /// <summary>
+    /// Applies platform compatibility filtering.
+    /// </summary>
+    private static IEnumerable<IProviderRegistration> ApplyPlatformFilter(IEnumerable<IProviderRegistration> candidates)
+    {
+        return candidates.Where(r => PlatformDetector.IsCompatible(r.Capabilities.Platform));
+    }
+
+    /// <summary>
+    /// Selects provider using consistent hashing based on shard key.
+    /// </summary>
+    private static IProviderRegistration SelectByConsistentHashing(IList<IProviderRegistration> candidates, string shardKey)
+    {
+        if (candidates.Count == 1)
+        {
+            return candidates[0];
+        }
+
+        // Sort providers by provider ID for consistent ordering
+        var sortedCandidates = candidates
+            .OrderBy(r => r.Capabilities.ProviderId, StringComparer.Ordinal)
+            .ToList();
+
+        // Use consistent hashing: hash(shardKey + providerId) to determine best match
+        var bestMatch = sortedCandidates[0];
+        var bestHash = ComputeConsistentHash(shardKey, bestMatch.Capabilities.ProviderId);
+
+        foreach (var candidate in sortedCandidates.Skip(1))
+        {
+            var candidateHash = ComputeConsistentHash(shardKey, candidate.Capabilities.ProviderId);
+            if (candidateHash > bestHash)
+            {
+                bestHash = candidateHash;
+                bestMatch = candidate;
+            }
+        }
+
+        return bestMatch;
+    }
+
+    /// <summary>
+    /// Computes a consistent hash for shard key and provider ID combination.
+    /// </summary>
+    private static uint ComputeConsistentHash(string shardKey, string providerId)
+    {
+        var combined = $"{shardKey}:{providerId}";
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(combined));
+        return BitConverter.ToUInt32(hashBytes, 0);
+    }
+
+    /// <summary>
+    /// Handles provider change events for cache invalidation.
+    /// </summary>
+    private void OnProviderChanged(object? sender, ProviderChangedEventArgs e)
+    {
+        // Invalidate cache when providers change for this service type
+        if (e.ServiceType == typeof(TService))
+        {
+            _cache.Clear();
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            if (_registry != null)
+            {
+                _registry.ProviderChanged -= OnProviderChanged;
+            }
+            _disposed = true;
+        }
+    }
+}
+
+/// <summary>
 /// Registry for default selection strategies provided by the runtime.
 /// </summary>
 public static class DefaultSelectionStrategies
@@ -388,5 +626,68 @@ public static class DefaultSelectionStrategies
         where TService : class
     {
         return new FanOutSelectionStrategy<TService>(registry, resilienceExecutor);
+    }
+    /// <summary>
+    /// Creates a default Sharded strategy for the specified service type with analytics shard key extraction.
+    /// </summary>
+    /// <typeparam name="TService">The service contract type.</typeparam>
+    /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
+    /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <returns>A Sharded selection strategy instance with analytics key extraction.</returns>
+    public static ISelectionStrategy<TService> CreateAnalyticsSharded<TService>(
+        IServiceRegistry? registry = null, 
+        TimeSpan? cacheTtl = null)
+        where TService : class
+    {
+        return new ShardedSelectionStrategy<TService>(
+            ExtractAnalyticsShardKey, 
+            registry, 
+            cacheTtl);
+    }
+
+    /// <summary>
+    /// Creates a Sharded strategy for the specified service type with custom key extraction.
+    /// </summary>
+    /// <typeparam name="TService">The service contract type.</typeparam>
+    /// <param name="keyExtractor">Function to extract shard key from selection metadata.</param>
+    /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
+    /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <returns>A Sharded selection strategy instance with custom key extraction.</returns>
+    public static ISelectionStrategy<TService> CreateSharded<TService>(
+        Func<IDictionary<string, object>?, string> keyExtractor,
+        IServiceRegistry? registry = null, 
+        TimeSpan? cacheTtl = null)
+        where TService : class
+    {
+        return new ShardedSelectionStrategy<TService>(keyExtractor, registry, cacheTtl);
+    }
+
+    /// <summary>
+    /// Default analytics shard key extractor that extracts event name prefix before the first dot.
+    /// Example: "player.level.complete" → "player"
+    /// </summary>
+    /// <param name="metadata">Selection metadata containing the event name or shard key.</param>
+    /// <returns>The extracted shard key.</returns>
+    public static string ExtractAnalyticsShardKey(IDictionary<string, object>? metadata)
+    {
+        if (metadata == null)
+        {
+            throw new ArgumentException("Analytics sharding requires metadata with EventName or ShardKey.");
+        }
+
+        // First, check for explicit shard key
+        if (metadata.TryGetValue("ShardKey", out var explicitKey) && explicitKey is string shardKey && !string.IsNullOrEmpty(shardKey))
+        {
+            return shardKey;
+        }
+
+        // Fall back to extracting from event name
+        if (metadata.TryGetValue("EventName", out var eventNameObj) && eventNameObj is string eventName && !string.IsNullOrEmpty(eventName))
+        {
+            var dotIndex = eventName.IndexOf('.');
+            return dotIndex > 0 ? eventName.Substring(0, dotIndex) : eventName;
+        }
+
+        throw new ArgumentException("Analytics sharding requires metadata with EventName or ShardKey.");
     }
 }

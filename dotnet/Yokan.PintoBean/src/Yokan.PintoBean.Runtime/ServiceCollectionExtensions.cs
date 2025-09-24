@@ -3,6 +3,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
+using System.Linq;
 
 namespace Yokan.PintoBean.Runtime;
 
@@ -48,5 +49,105 @@ public static class ServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Adds selection strategies to the service collection with category defaults per RFC-0003.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="configure">Optional delegate to configure selection strategy options.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection AddSelectionStrategies(this IServiceCollection services, Action<SelectionStrategyOptions>? configure = null)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        // Ensure service registry is registered
+        services.AddServiceRegistry();
+
+        // Check if options are already registered
+        var existingDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(SelectionStrategyOptions));
+        if (existingDescriptor != null)
+        {
+            // Options already registered, just apply configuration if provided
+            if (configure != null)
+            {
+                services.Remove(existingDescriptor);
+                
+                // If it was a singleton with an instance, get the instance and configure it
+                if (existingDescriptor.ImplementationInstance is SelectionStrategyOptions existingOptions)
+                {
+                    configure(existingOptions);
+                    services.AddSingleton(existingOptions);
+                }
+                else
+                {
+                    // It was registered with a factory, create new options and apply both configurations
+                    var options = new SelectionStrategyOptions();
+                    configure(options);
+                    services.AddSingleton(options);
+                }
+            }
+        }
+        else
+        {
+            // Configure and register selection strategy options for the first time
+            var options = new SelectionStrategyOptions();
+            configure?.Invoke(options);
+            services.TryAddSingleton(options);
+        }
+
+        // Register default strategy factory
+        services.TryAddSingleton<ISelectionStrategyFactory, DefaultSelectionStrategyFactory>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures the selection strategies to use PickOne for the specified service type.
+    /// </summary>
+    /// <typeparam name="TService">The service contract type.</typeparam>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection UsePickOneFor<TService>(this IServiceCollection services)
+        where TService : class
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        return services.AddSelectionStrategies(options => 
+            options.UseStrategyFor<TService>(SelectionStrategyType.PickOne));
+    }
+
+    /// <summary>
+    /// Configures the selection strategies to use FanOut for the specified service type.
+    /// </summary>
+    /// <typeparam name="TService">The service contract type.</typeparam>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection UseFanOutFor<TService>(this IServiceCollection services)
+        where TService : class
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        return services.AddSelectionStrategies(options => 
+            options.UseStrategyFor<TService>(SelectionStrategyType.FanOut));
+    }
+
+    /// <summary>
+    /// Configures the selection strategies to use Sharded for the specified service type.
+    /// </summary>
+    /// <typeparam name="TService">The service contract type.</typeparam>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection UseShardedFor<TService>(this IServiceCollection services)
+        where TService : class
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        return services.AddSelectionStrategies(options => 
+            options.UseStrategyFor<TService>(SelectionStrategyType.Sharded));
     }
 }
