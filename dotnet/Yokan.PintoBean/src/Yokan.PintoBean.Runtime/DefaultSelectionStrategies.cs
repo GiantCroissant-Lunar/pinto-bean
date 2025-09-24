@@ -18,6 +18,7 @@ public sealed class PickOneSelectionStrategy<TService> : ISelectionStrategy<TSer
 {
     private readonly IProviderSelectionCache<TService> _cache;
     private readonly IServiceRegistry? _registry;
+    private readonly IAspectRuntime _aspectRuntime;
     private bool _disposed;
 
     /// <summary>
@@ -25,10 +26,12 @@ public sealed class PickOneSelectionStrategy<TService> : ISelectionStrategy<TSer
     /// </summary>
     /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
     /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
-    public PickOneSelectionStrategy(IServiceRegistry? registry = null, TimeSpan? cacheTtl = null)
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
+    public PickOneSelectionStrategy(IServiceRegistry? registry = null, TimeSpan? cacheTtl = null, IAspectRuntime? aspectRuntime = null)
     {
         _cache = new SelectionCache<TService>(cacheTtl);
         _registry = registry;
+        _aspectRuntime = aspectRuntime ?? NoOpAspectRuntime.Instance;
 
         // Subscribe to provider changes for cache invalidation
         if (_registry != null)
@@ -59,12 +62,34 @@ public sealed class PickOneSelectionStrategy<TService> : ISelectionStrategy<TSer
         var cachedResult = _cache.TryGet(context);
         if (cachedResult != null)
         {
+            // Record cache hit
+            _aspectRuntime.RecordMetric("strategy.pickone.cache.hit", 1, 
+                ("service", typeof(TService).Name),
+                ("strategy", "PickOne"));
+            
+            // Record chosen provider
+            _aspectRuntime.RecordMetric("strategy.pickone.provider.selected", 1,
+                ("service", typeof(TService).Name),
+                ("provider", cachedResult.SelectionMetadata?.TryGetValue("ProviderId", out var pid) == true ? pid.ToString() ?? "unknown" : "unknown"),
+                ("source", "cache"));
+            
             return cachedResult;
         }
+
+        // Record cache miss
+        _aspectRuntime.RecordMetric("strategy.pickone.cache.miss", 1,
+            ("service", typeof(TService).Name),
+            ("strategy", "PickOne"));
 
         // Apply filtering and selection logic
         var selected = SelectProviderInternal(context);
         var selectedProvider = (TService)selected.Provider;
+
+        // Record chosen provider
+        _aspectRuntime.RecordMetric("strategy.pickone.provider.selected", 1,
+            ("service", typeof(TService).Name),
+            ("provider", selected.Capabilities.ProviderId),
+            ("source", "selection"));
 
         var result = SelectionResult<TService>.Single(
             selectedProvider,
@@ -231,6 +256,7 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
 {
     private readonly IServiceRegistry? _registry;
     private readonly IResilienceExecutor? _resilienceExecutor;
+    private readonly IAspectRuntime _aspectRuntime;
     private bool _disposed;
 
     /// <summary>
@@ -238,10 +264,12 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
     /// </summary>
     /// <param name="registry">Optional service registry for provider change monitoring.</param>
     /// <param name="resilienceExecutor">Optional resilience executor for fault handling.</param>
-    public FanOutSelectionStrategy(IServiceRegistry? registry = null, IResilienceExecutor? resilienceExecutor = null)
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
+    public FanOutSelectionStrategy(IServiceRegistry? registry = null, IResilienceExecutor? resilienceExecutor = null, IAspectRuntime? aspectRuntime = null)
     {
         _registry = registry;
         _resilienceExecutor = resilienceExecutor;
+        _aspectRuntime = aspectRuntime ?? NoOpAspectRuntime.Instance;
     }
 
     /// <inheritdoc />
@@ -253,6 +281,8 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
     /// <inheritdoc />
     public ISelectionResult<TService> SelectProviders(ISelectionContext<TService> context)
     {
+        var startTime = DateTime.UtcNow;
+        
         if (context == null)
             throw new ArgumentNullException(nameof(context));
 
@@ -262,32 +292,59 @@ public sealed class FanOutSelectionStrategy<TService> : ISelectionStrategy<TServ
                 $"No providers registered for service contract '{typeof(TService).Name}'.");
         }
 
-        // Apply filtering to get all compatible providers
-        var compatibleProviders = FilterCompatibleProviders(context);
-
-        if (!compatibleProviders.Any())
+        try
         {
-            throw new InvalidOperationException(
-                $"No compatible providers found for service contract '{typeof(TService).Name}' after applying filters.");
+            // Apply filtering to get all compatible providers
+            var compatibleProviders = FilterCompatibleProviders(context);
+
+            if (!compatibleProviders.Any())
+            {
+                // Record failure (no compatible providers)
+                _aspectRuntime.RecordMetric("strategy.fanout.failures", 1,
+                    ("service", typeof(TService).Name),
+                    ("reason", "no_compatible_providers"));
+                    
+                throw new InvalidOperationException(
+                    $"No compatible providers found for service contract '{typeof(TService).Name}' after applying filters.");
+            }
+
+            // Return all compatible providers for fan-out invocation
+            var selectedProviders = compatibleProviders
+                .Select(r => (TService)r.Provider)
+                .ToList();
+
+            // Record fanout size
+            _aspectRuntime.RecordMetric("strategy.fanout.size", selectedProviders.Count,
+                ("service", typeof(TService).Name),
+                ("strategy", "FanOut"));
+
+            // Record duration
+            var duration = DateTime.UtcNow - startTime;
+            _aspectRuntime.RecordMetric("strategy.fanout.duration", duration.TotalMilliseconds,
+                ("service", typeof(TService).Name),
+                ("strategy", "FanOut"));
+
+            var selectionMetadata = new Dictionary<string, object>
+            {
+                ["ProviderCount"] = selectedProviders.Count,
+                ["ProviderIds"] = compatibleProviders.Select(r => r.Capabilities.ProviderId).ToList(),
+                ["SelectionMethod"] = "FanOut (all compatible providers)",
+                ["StrategyType"] = "FanOut"
+            };
+
+            return new SelectionResult<TService>(
+                selectedProviders,
+                SelectionStrategyType.FanOut,
+                selectionMetadata);
         }
-
-        // Return all compatible providers for fan-out invocation
-        var selectedProviders = compatibleProviders
-            .Select(r => (TService)r.Provider)
-            .ToList();
-
-        var selectionMetadata = new Dictionary<string, object>
+        catch (Exception)
         {
-            ["ProviderCount"] = selectedProviders.Count,
-            ["ProviderIds"] = compatibleProviders.Select(r => r.Capabilities.ProviderId).ToList(),
-            ["SelectionMethod"] = "FanOut (all compatible providers)",
-            ["StrategyType"] = "FanOut"
-        };
-
-        return new SelectionResult<TService>(
-            selectedProviders,
-            SelectionStrategyType.FanOut,
-            selectionMetadata);
+            // Record general failure
+            _aspectRuntime.RecordMetric("strategy.fanout.failures", 1,
+                ("service", typeof(TService).Name),
+                ("reason", "selection_failed"));
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -373,6 +430,7 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
     private readonly IProviderSelectionCache<TService> _cache;
     private readonly IServiceRegistry? _registry;
     private readonly Func<IDictionary<string, object>?, string> _keyExtractor;
+    private readonly IAspectRuntime _aspectRuntime;
     private bool _disposed;
 
     /// <summary>
@@ -381,14 +439,17 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
     /// <param name="keyExtractor">Function to extract shard key from selection metadata.</param>
     /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
     /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
     public ShardedSelectionStrategy(
         Func<IDictionary<string, object>?, string> keyExtractor,
         IServiceRegistry? registry = null,
-        TimeSpan? cacheTtl = null)
+        TimeSpan? cacheTtl = null,
+        IAspectRuntime? aspectRuntime = null)
     {
         _keyExtractor = keyExtractor ?? throw new ArgumentNullException(nameof(keyExtractor));
         _cache = new SelectionCache<TService>(cacheTtl);
         _registry = registry;
+        _aspectRuntime = aspectRuntime ?? NoOpAspectRuntime.Instance;
 
         // Subscribe to provider changes for cache invalidation
         if (_registry != null)
@@ -422,6 +483,12 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
             throw new InvalidOperationException("Shard key extraction returned null or empty string.");
         }
 
+        // Record shard key
+        _aspectRuntime.RecordMetric("strategy.sharded.shard_key", 1,
+            ("service", typeof(TService).Name),
+            ("shard_key", shardKey),
+            ("strategy", "Sharded"));
+
         // Try cache first (including shard key in cache context)
         var cachedResult = _cache.TryGet(context);
         if (cachedResult != null)
@@ -432,6 +499,12 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
         // Apply filtering and shard-based selection
         var selected = SelectProviderByShard(context, shardKey);
         var selectedProvider = (TService)selected.Provider;
+
+        // Record target provider
+        _aspectRuntime.RecordMetric("strategy.sharded.target", 1,
+            ("service", typeof(TService).Name),
+            ("shard_key", shardKey),
+            ("target_provider", selected.Capabilities.ProviderId));
 
         var result = SelectionResult<TService>.Single(
             selectedProvider,
@@ -618,13 +691,15 @@ public static class DefaultSelectionStrategies
     /// <typeparam name="TService">The service contract type.</typeparam>
     /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
     /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
     /// <returns>A PickOne selection strategy instance.</returns>
     public static ISelectionStrategy<TService> CreatePickOne<TService>(
         IServiceRegistry? registry = null,
-        TimeSpan? cacheTtl = null)
+        TimeSpan? cacheTtl = null,
+        IAspectRuntime? aspectRuntime = null)
         where TService : class
     {
-        return new PickOneSelectionStrategy<TService>(registry, cacheTtl);
+        return new PickOneSelectionStrategy<TService>(registry, cacheTtl, aspectRuntime);
     }
 
     /// <summary>
@@ -633,13 +708,15 @@ public static class DefaultSelectionStrategies
     /// <typeparam name="TService">The service contract type.</typeparam>
     /// <param name="registry">Optional service registry for provider change monitoring.</param>
     /// <param name="resilienceExecutor">Optional resilience executor for fault handling.</param>
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
     /// <returns>A FanOut selection strategy instance.</returns>
     public static ISelectionStrategy<TService> CreateFanOut<TService>(
         IServiceRegistry? registry = null,
-        IResilienceExecutor? resilienceExecutor = null)
+        IResilienceExecutor? resilienceExecutor = null,
+        IAspectRuntime? aspectRuntime = null)
         where TService : class
     {
-        return new FanOutSelectionStrategy<TService>(registry, resilienceExecutor);
+        return new FanOutSelectionStrategy<TService>(registry, resilienceExecutor, aspectRuntime);
     }
     /// <summary>
     /// Creates a default Sharded strategy for the specified service type with analytics shard key extraction.
@@ -647,16 +724,19 @@ public static class DefaultSelectionStrategies
     /// <typeparam name="TService">The service contract type.</typeparam>
     /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
     /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
     /// <returns>A Sharded selection strategy instance with analytics key extraction.</returns>
     public static ISelectionStrategy<TService> CreateAnalyticsSharded<TService>(
         IServiceRegistry? registry = null,
-        TimeSpan? cacheTtl = null)
+        TimeSpan? cacheTtl = null,
+        IAspectRuntime? aspectRuntime = null)
         where TService : class
     {
         return new ShardedSelectionStrategy<TService>(
             ExtractAnalyticsShardKey,
             registry,
-            cacheTtl);
+            cacheTtl,
+            aspectRuntime);
     }
 
     /// <summary>
@@ -666,14 +746,16 @@ public static class DefaultSelectionStrategies
     /// <param name="keyExtractor">Function to extract shard key from selection metadata.</param>
     /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
     /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
     /// <returns>A Sharded selection strategy instance with custom key extraction.</returns>
     public static ISelectionStrategy<TService> CreateSharded<TService>(
         Func<IDictionary<string, object>?, string> keyExtractor,
         IServiceRegistry? registry = null,
-        TimeSpan? cacheTtl = null)
+        TimeSpan? cacheTtl = null,
+        IAspectRuntime? aspectRuntime = null)
         where TService : class
     {
-        return new ShardedSelectionStrategy<TService>(keyExtractor, registry, cacheTtl);
+        return new ShardedSelectionStrategy<TService>(keyExtractor, registry, cacheTtl, aspectRuntime);
     }
 
     /// <summary>
