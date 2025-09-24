@@ -241,4 +241,49 @@ public static class ServiceCollectionExtensions
         return services.AddSelectionStrategies(options =>
             options.UseStrategyFor<TService>(SelectionStrategyType.Sharded));
     }
+
+    /// <summary>
+    /// Configures the selection strategies to use PickOne as the default for the specified service category.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="category">The service category to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection UsePickOneForCategory(this IServiceCollection services, ServiceCategory category)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        return services.AddSelectionStrategies(options =>
+            options.SetCategoryDefault(category, SelectionStrategyType.PickOne));
+    }
+
+    /// <summary>
+    /// Configures the selection strategies to use FanOut as the default for the specified service category.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="category">The service category to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection UseFanOutForCategory(this IServiceCollection services, ServiceCategory category)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        return services.AddSelectionStrategies(options =>
+            options.SetCategoryDefault(category, SelectionStrategyType.FanOut));
+    }
+
+    /// <summary>
+    /// Configures the selection strategies to use Sharded as the default for the specified service category.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="category">The service category to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection UseShardedForCategory(this IServiceCollection services, ServiceCategory category)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        return services.AddSelectionStrategies(options =>
+            options.SetCategoryDefault(category, SelectionStrategyType.Sharded));
+    }
 }

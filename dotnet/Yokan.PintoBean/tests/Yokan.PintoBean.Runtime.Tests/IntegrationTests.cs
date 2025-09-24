@@ -139,6 +139,62 @@ public class IntegrationTests
         Assert.Equal(SelectionStrategyType.PickOne, storyStrategy.StrategyType);
     }
 
+    [Fact]
+    public void End2End_CategoryDefaultsHelpers_ShouldSetCategoryDefaults()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act - Use category-level helper methods to change defaults
+        services.UsePickOneForCategory(ServiceCategory.Analytics)  // Override Analytics from FanOut to PickOne
+                .UseFanOutForCategory(ServiceCategory.Resources)   // Override Resources from PickOne to FanOut
+                .UseShardedForCategory(ServiceCategory.AI);        // Override AI from PickOne to Sharded
+
+        var serviceProvider = services.BuildServiceProvider();
+        var factory = serviceProvider.GetRequiredService<ISelectionStrategyFactory>();
+
+        // Assert - Verify Analytics uses PickOne (overridden from default FanOut)
+        var analyticsStrategy = factory.CreateStrategy<IAnalyticsService>();
+        Assert.Equal(SelectionStrategyType.PickOne, analyticsStrategy.StrategyType);
+
+        // Assert - Verify Resources uses FanOut (overridden from default PickOne)  
+        var resourceStrategy = factory.CreateStrategy<IResourceService>();
+        Assert.Equal(SelectionStrategyType.FanOut, resourceStrategy.StrategyType);
+
+        // Assert - Verify AI uses Sharded (overridden from default PickOne)
+        var aiStrategy = factory.CreateStrategy<IAIService>();
+        Assert.Equal(SelectionStrategyType.Sharded, aiStrategy.StrategyType);
+
+        // Assert - Verify SceneFlow still uses default PickOne (not overridden)
+        var sceneFlowStrategy = factory.CreateStrategy<ISceneFlowService>();
+        Assert.Equal(SelectionStrategyType.PickOne, sceneFlowStrategy.StrategyType);
+    }
+
+    [Fact]
+    public void End2End_CategoryDefaultsWithPerContractOverrides_ShouldRespectBothLevels()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act - Set category default and then override specific contracts
+        services.UsePickOneForCategory(ServiceCategory.Analytics)  // Set Analytics category to PickOne
+                .UseFanOutFor<IAnalyticsService>();                 // But override this specific analytics service to FanOut
+
+        var serviceProvider = services.BuildServiceProvider();
+        var factory = serviceProvider.GetRequiredService<ISelectionStrategyFactory>();
+
+        // Assert - Verify specific contract override takes precedence over category default
+        var analyticsStrategy = factory.CreateStrategy<IAnalyticsService>();
+        Assert.Equal(SelectionStrategyType.FanOut, analyticsStrategy.StrategyType);
+
+        // Assert - Verify other analytics services still use the category default
+        var metricsStrategy = factory.CreateStrategy<IMetricsService>();
+        Assert.Equal(SelectionStrategyType.PickOne, metricsStrategy.StrategyType);
+
+        var telemetryStrategy = factory.CreateStrategy<ITelemetryService>();
+        Assert.Equal(SelectionStrategyType.PickOne, telemetryStrategy.StrategyType);
+    }
+
     // Test service interfaces for category inference
     public interface IAnalyticsService { void Track(string eventName); }
     public interface IResourceService { string LoadResource(string key); }
