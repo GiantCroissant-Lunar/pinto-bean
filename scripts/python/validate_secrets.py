@@ -186,7 +186,9 @@ def scan_git_index() -> None:
             text = p.read_text(errors="ignore")
         except OSError:  # file read or encoding issue
             continue
-        for match in secret_like.findall(text):
+        # Iterate with positions to apply contextual filters (e.g., JSON keys)
+        for m in secret_like.finditer(text):
+            match = m.group(0)
             if len(match) < MIN_SECRET_LENGTH:
                 continue
             if _is_placeholder(match):
@@ -194,6 +196,23 @@ def scan_git_index() -> None:
             # Skip canonical UUID/GUID tokens (common in project/solution files, not secrets)
             if UUID_RE.match(match):
                 continue
+            # Heuristic: ignore long tokens that are JSON keys, i.e., "<token>":
+            # We check that the token is wrapped in double quotes and is immediately followed by
+            # a closing quote and a colon (with optional whitespace between quote and colon).
+            try:
+                s, e = m.start(), m.end()
+                if s >= 1 and text[s - 1] == '"' and e < len(text) and text[e] == '"':
+                    j = e + 1
+                    while j < len(text) and text[j] in " \t\r\n":
+                        j += 1
+                    if j < len(text) and text[j] == ":":
+                        # Looks like a JSON object key, skip to reduce false positives
+                        continue
+            except Exception as ctx_err:
+                # Log minimal context; continue normal handling
+                print(
+                    f"[validator] context check skipped: {type(ctx_err).__name__}", file=sys.stderr
+                )
             # Ignore integrity hashes (sha512-BASE64) present in any *-lock.yaml file (e.g., pnpm-lock.yaml)
             if rel.endswith("-lock.yaml") and match.startswith("sha512-"):
                 SKIP_METRICS["integrity_hashes"] = int(SKIP_METRICS["integrity_hashes"]) + 1
@@ -234,7 +253,8 @@ def scan_git_index() -> None:
                 # Avoid duplicate Age private key detection outside standard location
                 if rule_id == "AGE_PRIVATE_KEY" and rel.endswith("age.key"):
                     continue
-                classify(rule_id, sev, f"{rule_id} candidate in {rel}", rel, m)
+                token_str = m if isinstance(m, str) else str(m)
+                classify(rule_id, sev, f"{rule_id} candidate in {rel}", rel, token_str)
 
 
 def check_age_key() -> None:
