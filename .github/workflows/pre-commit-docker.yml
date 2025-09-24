@@ -1,13 +1,21 @@
 ---
-name: Pre-Commit (Docker - Fast) - DISABLED
+name: Pre-Commit (Docker - Fast)
 
 'on':
-  # Disabled due to Docker package permissions issues
-  # Need to properly configure package visibility and permissions
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - '.pre-commit-config.yaml'
+      - 'scripts/**'
+      - 'tools/**'
+      - '.github/workflows/pre-commit-docker.yml'
   workflow_dispatch: {}
 
 permissions:
   contents: read
+  packages: read  # allow pulling Docker images from GHCR
   security-events: write  # allow SARIF upload if secret scan produces one
 
 jobs:
@@ -15,8 +23,10 @@ jobs:
     name: Run pre-commit hooks (Docker)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/giantcroissant-lunar/pinto-bean/precommit:latest
-      # No credentials needed for public images
+      image: ghcr.io/${{ github.repository }}/precommit:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 15
     steps:
       - name: Checkout
