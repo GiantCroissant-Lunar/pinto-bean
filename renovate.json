@@ -5,11 +5,17 @@
     "group:allNonMajor",
     "schedule:weekly"
   ],
-  "timezone": "Etc/UTC",
+  "timezone": "Asia/Taipei",
   "prHourlyLimit": 4,
   "prConcurrentLimit": 10,
   "rangeStrategy": "bump",
   "ignoreTests": true,
+  "dependencyDashboard": true,
+  "dependencyDashboardLabels": ["dependencies", "renovate"],
+  "dependencyDashboardTitle": "Renovate Dependency Dashboard",
+  "dependencyDashboardHeader": "This issue tracks all Renovate updates for pinto-bean. See renovate.json for grouping and automerge policies.",
+  "dependencyDashboardAutoclose": true,
+  "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
@@ -48,6 +54,5 @@
     }
   ],
   "enabledManagers": ["github-actions", "pip_requirements", "terraform", "nuget"],
-  "commitMessagePrefix": "chore(deps): ",
-  "dependencyDashboard": true
+  "commitMessagePrefix": "chore(deps): "
 }
