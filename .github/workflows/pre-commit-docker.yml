@@ -1,16 +1,9 @@
 ---
-name: Pre-Commit (Docker - Fast)
+name: Pre-Commit (Docker - Fast) - DISABLED
 
 'on':
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-    paths:
-      - '.pre-commit-config.yaml'
-      - 'scripts/**'
-      - 'tools/**'
-      - '.github/workflows/pre-commit-docker.yml'
+  # Disabled due to Docker package permissions issues
+  # Need to properly configure package visibility and permissions
   workflow_dispatch: {}
 
 permissions:
