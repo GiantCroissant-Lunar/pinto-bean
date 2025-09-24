@@ -34,4 +34,25 @@ public static class SelfLoader
             alc.Unload();
         }
     }
+
+    // Load a specified assembly file into a collectible ALC and invoke ConsoleGame.TerminalLib.TuiInfo.GetInfo().
+    public static string LoadTerminalLibAndGetInfo(string assemblyPath)
+    {
+        if (string.IsNullOrWhiteSpace(assemblyPath)) throw new ArgumentException("assemblyPath is required", nameof(assemblyPath));
+        var alc = new PluginLoadContext(assemblyPath);
+        try
+        {
+            var asm = alc.LoadFromAssemblyPath(assemblyPath);
+            var type = asm.GetType("ConsoleGame.TerminalLib.TuiInfo");
+            if (type == null) throw new InvalidOperationException("TuiInfo type not found in TerminalLib.");
+            var method = type.GetMethod("GetInfo", BindingFlags.Public | BindingFlags.Static);
+            if (method == null) throw new InvalidOperationException("GetInfo method not found on TuiInfo.");
+            var result = method.Invoke(null, null) as string ?? string.Empty;
+            return $"Plugin: {result} | Context={alc.Name}";
+        }
+        finally
+        {
+            alc.Unload();
+        }
+    }
 }

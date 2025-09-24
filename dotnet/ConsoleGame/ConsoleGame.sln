@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{71700090
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleGame.Tests", "tests\ConsoleGame.Tests\ConsoleGame.Tests.csproj", "{4F1F26F0-A4D2-4E1D-BADB-0E48C43AC3AD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleGame.TerminalLib", "src\ConsoleGame.TerminalLib\ConsoleGame.TerminalLib.csproj", "{C2593283-ABEE-4480-ADD1-7FBF7B9847D6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,9 +30,14 @@ Global
 		{4F1F26F0-A4D2-4E1D-BADB-0E48C43AC3AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4F1F26F0-A4D2-4E1D-BADB-0E48C43AC3AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4F1F26F0-A4D2-4E1D-BADB-0E48C43AC3AD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2593283-ABEE-4480-ADD1-7FBF7B9847D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2593283-ABEE-4480-ADD1-7FBF7B9847D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2593283-ABEE-4480-ADD1-7FBF7B9847D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2593283-ABEE-4480-ADD1-7FBF7B9847D6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{8AD0F2E4-178F-470D-9FED-687717597602} = {8A227101-A71C-41D3-8B08-C3BE2A5437DD}
 		{4F1F26F0-A4D2-4E1D-BADB-0E48C43AC3AD} = {71700090-8B0D-41C5-B9A1-74241E6EEB60}
+		{C2593283-ABEE-4480-ADD1-7FBF7B9847D6} = {8A227101-A71C-41D3-8B08-C3BE2A5437DD}
 	EndGlobalSection
 EndGlobal
