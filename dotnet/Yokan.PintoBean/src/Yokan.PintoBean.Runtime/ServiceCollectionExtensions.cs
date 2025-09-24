@@ -3,6 +3,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
+using System.Linq;
 
 namespace Yokan.PintoBean.Runtime;
 
@@ -64,10 +65,37 @@ public static class ServiceCollectionExtensions
         // Ensure service registry is registered
         services.AddServiceRegistry();
 
-        // Configure and register selection strategy options
-        var options = new SelectionStrategyOptions();
-        configure?.Invoke(options);
-        services.TryAddSingleton(options);
+        // Check if options are already registered
+        var existingDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(SelectionStrategyOptions));
+        if (existingDescriptor != null)
+        {
+            // Options already registered, just apply configuration if provided
+            if (configure != null)
+            {
+                services.Remove(existingDescriptor);
+                
+                // If it was a singleton with an instance, get the instance and configure it
+                if (existingDescriptor.ImplementationInstance is SelectionStrategyOptions existingOptions)
+                {
+                    configure(existingOptions);
+                    services.AddSingleton(existingOptions);
+                }
+                else
+                {
+                    // It was registered with a factory, create new options and apply both configurations
+                    var options = new SelectionStrategyOptions();
+                    configure(options);
+                    services.AddSingleton(options);
+                }
+            }
+        }
+        else
+        {
+            // Configure and register selection strategy options for the first time
+            var options = new SelectionStrategyOptions();
+            configure?.Invoke(options);
+            services.TryAddSingleton(options);
+        }
 
         // Register default strategy factory
         services.TryAddSingleton<ISelectionStrategyFactory, DefaultSelectionStrategyFactory>();
