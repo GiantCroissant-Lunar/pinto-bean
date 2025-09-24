@@ -1,7 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -311,17 +313,47 @@ public partial class MixedService
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source);
             
-            // Create a basic compilation with simplified reference loading
+            // Get the path to the CodeGen assembly that contains RealizeServiceAttribute
 #pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
+            var codeGenAssemblyPath = Path.Combine(
+                Path.GetDirectoryName(typeof(PintoBeanAnalyzerTests).Assembly.Location)!,
+                "Yokan.PintoBean.CodeGen.dll");
+#pragma warning restore IL3000
+            
+            var references = new List<MetadataReference>
+            {
+#pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location), // System.Private.CoreLib
+#pragma warning restore IL3000
+            };
+            
+            // Add CodeGen reference if the assembly exists
+            if (File.Exists(codeGenAssemblyPath))
+            {
+                references.Add(MetadataReference.CreateFromFile(codeGenAssemblyPath));
+            }
+            else
+            {
+                // Fallback: try to get the reference from the current context
+                try
+                {
+#pragma warning disable IL3000 // Assembly.Location is only supported in single-file mode on .NET 6+
+                    references.Add(MetadataReference.CreateFromFile(typeof(RealizeServiceAttribute).Assembly.Location));
+                    references.Add(MetadataReference.CreateFromFile(typeof(GenerateRegistryAttribute).Assembly.Location));
+#pragma warning restore IL3000
+                }
+                catch
+                {
+                    // If we can't load the references, the tests will fail with meaningful messages
+                }
+            }
+
             var compilation = CSharpCompilation.Create(
                 assemblyName,
                 new[] { syntaxTree },
-                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-#pragma warning restore IL3000
 
-            // Since we can't easily load all the complex references in the test environment,
-            // we'll accept that some attribute resolution may fail but the syntax analysis should work
             return compilation;
         }
 
@@ -344,18 +376,23 @@ public partial class MixedService
                 actualCount = relevantDiagnostics.Length;
                 actualDiagnostics = relevantDiagnostics.ToImmutableArray();
             }
+
+            // Filter to only SG000x diagnostics for our analyzer
+            var filteredDiagnostics = actualDiagnostics.Where(d => d.Id.StartsWith("SG000")).ToImmutableArray();
             
-            if (expectedCount != actualCount)
+            if (expectedCount != filteredDiagnostics.Length)
             {
-                var actualDiagnosticMessages = string.Join(", ", actualDiagnostics.Select(d => d.Id + ": " + d.GetMessage()));
+                var actualDiagnosticMessages = string.Join(", ", filteredDiagnostics.Select(d => d.Id + ": " + d.GetMessage()));
+                var allDiagnosticMessages = string.Join(", ", actualDiagnostics.Select(d => d.Id + ": " + d.GetMessage()));
                 Assert.True(false, 
-                    $"Expected {expectedCount} diagnostics but got {actualCount}. " +
-                    $"Actual diagnostics: {actualDiagnosticMessages}");
+                    $"Expected {expectedCount} SG000x diagnostics but got {filteredDiagnostics.Length}. " +
+                    $"Actual SG000x diagnostics: {actualDiagnosticMessages}. " +
+                    $"All diagnostics: {allDiagnosticMessages}");
             }
 
             for (int i = 0; i < expectedResults.Length; i++)
             {
-                var actual = actualDiagnostics[i];
+                var actual = filteredDiagnostics[i];
                 var expected = expectedResults[i];
 
                 Assert.Equal(expected.Id, actual.Id);

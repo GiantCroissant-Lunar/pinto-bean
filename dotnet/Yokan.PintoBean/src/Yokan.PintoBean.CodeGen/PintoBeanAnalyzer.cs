@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -102,7 +103,6 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
         context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
-        context.RegisterSymbolAction(AnalyzeNamedType, SymbolKind.NamedType);
     }
 
     private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
@@ -118,29 +118,6 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
         if (realizeServiceAttribute != null)
         {
             AnalyzeRealizeServiceUsage(context, classDeclaration, classSymbol, realizeServiceAttribute);
-        }
-    }
-
-    private static void AnalyzeNamedType(SymbolAnalysisContext context)
-    {
-        var namedType = (INamedTypeSymbol)context.Symbol;
-        
-        // Check for RealizeServiceAttribute and missing GenerateRegistry
-        var realizeServiceAttribute = GetRealizeServiceAttribute(namedType);
-        if (realizeServiceAttribute != null)
-        {
-            var contractTypes = GetContractTypesFromAttribute(realizeServiceAttribute);
-            foreach (var contractType in contractTypes)
-            {
-                if (!HasGenerateRegistryAttribute(context.Compilation, contractType))
-                {
-                    var diagnostic = Diagnostic.Create(
-                        MissingGenerateRegistry,
-                        namedType.Locations.FirstOrDefault() ?? Location.None,
-                        contractType.ToDisplayString());
-                    context.ReportDiagnostic(diagnostic);
-                }
-            }
         }
     }
 
@@ -179,6 +156,7 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
                 RealizeServiceWithoutContracts,
                 GetAttributeLocation(classDeclaration, "RealizeServiceAttribute") ?? classDeclaration.Identifier.GetLocation());
             context.ReportDiagnostic(diagnostic);
+            return; // No point continuing if there are no contracts
         }
 
         // SG0004: Check façade method signature mismatches (simplified check)
@@ -188,6 +166,19 @@ public class PintoBeanAnalyzer : DiagnosticAnalyzer
         if (contractTypes.Length > 1)
         {
             AnalyzeMultiContractCategories(context, classDeclaration, contractTypes);
+        }
+
+        // SG0003: Check for missing GenerateRegistry for each realized contract
+        foreach (var contractType in contractTypes)
+        {
+            if (!HasGenerateRegistryAttribute(context.SemanticModel.Compilation, contractType))
+            {
+                var diagnostic = Diagnostic.Create(
+                    MissingGenerateRegistry,
+                    GetAttributeLocation(classDeclaration, "RealizeServiceAttribute") ?? classDeclaration.Identifier.GetLocation(),
+                    contractType.ToDisplayString());
+                context.ReportDiagnostic(diagnostic);
+            }
         }
     }
 
