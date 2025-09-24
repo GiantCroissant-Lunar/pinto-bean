@@ -46,7 +46,8 @@ jobs:
 
       - name: Configure git (required for pre-commit)
         run: |
-          git config --global --add safe.directory /github/workspace
+          git config --global --add safe.directory ${{ github.workspace }}
+          git config --global --add safe.directory /__w/pinto-bean/pinto-bean
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
 
