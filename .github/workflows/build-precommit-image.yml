@@ -65,7 +65,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: ${{ inputs.force_rebuild == 'true' && 'type=inline' || 'type=gha' }}
-          cache-to: ${{ inputs.force_rebuild == 'true' && 'type=inline' || 'type=gha,mode=max' }}
-          no-cache: ${{ inputs.force_rebuild == 'true' }}
+          cache-from: ${{ inputs.force_rebuild != true && 'type=gha' || '' }}
+          cache-to: ${{ inputs.force_rebuild != true && 'type=gha,mode=max' || '' }}
+          no-cache: ${{ inputs.force_rebuild == true }}
           platforms: linux/amd64
