@@ -21,7 +21,6 @@ dist/
 
 # Build and cache directories
 .cache/
-build/
 
 # Log4brains generated files
 .log4brains/
