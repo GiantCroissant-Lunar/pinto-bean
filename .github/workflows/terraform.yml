@@ -55,7 +55,6 @@ jobs:
           path: coverage.xml
   terraform:
     needs: [tests]
-    environment: dev
     runs-on: ubuntu-latest
     env:
       TF_IN_AUTOMATION: true
