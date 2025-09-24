@@ -1,4 +1,5 @@
 ﻿using ConsoleGame.App;
+using ConsoleGame.Contracts;
 
 Console.WriteLine("ConsoleGame.App – AssemblyLoadContext demo");
 var message = SelfLoader.LoadSelfAndInvoke();
@@ -25,6 +26,17 @@ try
 	{
 		var pluginMsg = SelfLoader.LoadTerminalLibAndGetInfo(terminalLibPath);
 		Console.WriteLine(pluginMsg);
+
+		// Also load via IPlugin contract
+		try
+		{
+			IPlugin plugin = SelfLoader.LoadPlugin(terminalLibPath);
+			Console.WriteLine($"IPlugin: {plugin.Name} => {plugin.Describe()}");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"IPlugin load failed: {ex.GetType().Name}: {ex.Message}");
+		}
 	}
 	else
 	{

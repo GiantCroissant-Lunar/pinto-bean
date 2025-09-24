@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using ConsoleGame.App;
+using ConsoleGame.Contracts;
 using Xunit;
 
 namespace ConsoleGame.Tests;
@@ -25,5 +26,20 @@ public class TerminalLibLoaderTests
         var msg = SelfLoader.LoadTerminalLibAndGetInfo(candidate);
         Assert.Contains("Terminal.Gui loaded:", msg);
         Assert.Contains("Context=TerminalLibContext", msg);
+    }
+
+    [Fact]
+    public void LoadPlugin_Describe_WorksThroughContract()
+    {
+        var baseDir = AppContext.BaseDirectory;
+        var tfmDir = new DirectoryInfo(baseDir).Name;
+        var configDir = new DirectoryInfo(baseDir).Parent?.Name ?? "Debug";
+        var pluginPath = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "src", "ConsoleGame.TerminalLib", "bin", configDir, tfmDir, "ConsoleGame.TerminalLib.dll"));
+        if (!File.Exists(pluginPath)) return; // skip
+
+        IPlugin plugin = SelfLoader.LoadPlugin(pluginPath);
+        var desc = plugin.Describe();
+        Assert.Contains("Terminal.Gui", desc);
+        Assert.Contains("Plugin", desc);
     }
 }

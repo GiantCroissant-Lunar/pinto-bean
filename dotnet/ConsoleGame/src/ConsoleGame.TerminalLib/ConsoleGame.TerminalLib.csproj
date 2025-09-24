@@ -10,4 +10,8 @@
     <PackageReference Include="Terminal.Gui" Version="2.*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ConsoleGame.Contracts\ConsoleGame.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

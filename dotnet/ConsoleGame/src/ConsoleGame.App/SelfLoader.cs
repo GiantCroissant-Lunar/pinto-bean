@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using ConsoleGame.Contracts;
 
 namespace ConsoleGame.App;
 
@@ -53,6 +54,28 @@ public static class SelfLoader
         finally
         {
             alc.Unload();
+        }
+    }
+
+    public static IPlugin LoadPlugin(string pluginAssemblyPath)
+    {
+        if (string.IsNullOrWhiteSpace(pluginAssemblyPath)) throw new ArgumentException("pluginAssemblyPath is required", nameof(pluginAssemblyPath));
+        var alc = new PluginLoadContext(pluginAssemblyPath);
+        try
+        {
+            var asm = alc.LoadFromAssemblyPath(pluginAssemblyPath);
+            var pluginType = asm.GetType("ConsoleGame.TerminalLib.TuiPlugin");
+            if (pluginType == null) throw new InvalidOperationException("Plugin type not found in assembly.");
+            if (!typeof(IPlugin).IsAssignableFrom(pluginType)) throw new InvalidOperationException("Type does not implement IPlugin.");
+            // Create instance in the plugin context; return as IPlugin (contract lives in default context)
+            var instance = Activator.CreateInstance(pluginType);
+            return (IPlugin)instance!;
+        }
+        catch
+        {
+            // Ensure unload on failure too
+            alc.Unload();
+            throw;
         }
     }
 }
