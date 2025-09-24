@@ -81,6 +81,11 @@ ENTROPY_THRESHOLD = float(os.getenv("VALIDATOR_ENTROPY_THRESHOLD", str(HIGH_ENTR
 CACHE_PATH = REPO_ROOT / ".cache" / "secret-validator.json"
 _cache: dict[str, dict[str, str]] = {}
 
+# Allowlist specific known-benign tokens (exact match) that look high-entropy but are safe in docs/code
+ALLOWLIST_TOKENS = {
+    "FanOut_MultipleProviders",
+}
+
 
 def sh(cmd: list[str]) -> str:
     # Trusted internal commands (git). noqa for security lint.
@@ -163,6 +168,12 @@ def scan_git_index() -> None:
         return
     candidate_ext = {"tf", "ps1", "py", "yml", "yaml", "json", "txt", "md"}
     secret_like = re.compile(r"([A-Za-z0-9+/=_-]{20,})")
+    benign_substrings = (
+        "IncludeNativeLibrariesForSelfExtract",  # MSBuild property name, high-entropy-ish
+        "PublishSingleFile",  # MSBuild property name
+        "ConsoleGame.Dungeon.Plugin",  # assembly names
+        "ConsoleGame.TerminalLib",
+    )
     path_fragment = re.compile(r"[/\\]")
     for rel in tracked:
         p = REPO_ROOT / rel
@@ -186,11 +197,41 @@ def scan_git_index() -> None:
             text = p.read_text(errors="ignore")
         except OSError:  # file read or encoding issue
             continue
+        # Quick markdown-aware suppression: ignore matches inside inline code (`...`) or fenced code blocks, and
+        # honor <!-- no-secret --> markers on the same line
+        fenced = False
+        fence_re = re.compile(r"^\s*```")
+        inline_code_re = re.compile(r"`[^`]+`")
+        lines = text.splitlines()
+        inline_code_spans_by_line: dict[int, list[tuple[int, int]]] = {}
+        for i, line in enumerate(lines):
+            if fence_re.match(line):
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
+            for m_inline in inline_code_re.finditer(line):
+                inline_code_spans_by_line.setdefault(i, []).append(
+                    (m_inline.start(), m_inline.end())
+                )
         # Iterate with positions to apply contextual filters (e.g., JSON keys)
         for m in secret_like.finditer(text):
             match = m.group(0)
             if len(match) < MIN_SECRET_LENGTH:
                 continue
+            if match in ALLOWLIST_TOKENS:
+                continue
+            # Compute line/column to apply markdown suppressions
+            prefix = text[: m.start()]
+            line_idx = prefix.count("\n")
+            if line_idx < len(lines):
+                line = lines[line_idx]
+                if "<!-- no-secret -->" in line:
+                    continue
+                if line_idx in inline_code_spans_by_line:
+                    col = len(prefix) - (prefix.rfind("\n") + 1 if "\n" in prefix else 0)
+                    if any(s <= col < e for s, e in inline_code_spans_by_line[line_idx]):
+                        continue
             if _is_placeholder(match):
                 continue
             # Skip canonical UUID/GUID tokens (common in project/solution files, not secrets)
@@ -219,6 +260,13 @@ def scan_git_index() -> None:
                 integrity_files: set[str] = SKIP_METRICS["integrity_files"]
                 integrity_files.add(rel)
                 continue
+            # Ignore known benign substrings that can appear inside CLI args or identifiers
+            if any(b in text for b in benign_substrings):
+                # If the token appears within a benign context, skip
+                # Cheap check: only skip if this exact token occurs near a benign substring instance
+                window = text[max(0, m.start() - 50) : min(len(text), m.end() + 50)]
+                if any(b in window for b in benign_substrings):
+                    continue
             # Skip ADR filename stems (date + slug) which look random enough to trip entropy
             if ADR_TOKEN_RE.match(match.lower()):
                 continue

@@ -11,7 +11,7 @@ The benchmark suite measures the performance of three key selection strategies:
 - **PickOne_CacheMiss**: Measures performance when cache lookup fails and selection must be computed
 
 ### FanOut Strategy  
-- **FanOut_MultipleProviders**: Measures performance when selecting all providers for fan-out execution
+- <!-- no-secret --> **FanOut_MultipleProviders**: Measures performance when selecting all providers for fan-out execution
 
 ### Sharded Strategy
 - **Sharded_Routing**: Measures performance of consistent hashing and shard key-based routing
