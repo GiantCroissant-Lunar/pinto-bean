@@ -2,15 +2,16 @@
 name: Pre-Commit (Docker - Fast)
 
 'on':
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-    paths:
-      - '.pre-commit-config.yaml'
-      - 'scripts/**'
-      - 'tools/**'
-      - '.github/workflows/pre-commit-docker.yml'
+  # Temporarily disabled due to Docker image permissions issues
+  # pull_request:
+  #   branches: [main]
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - '.pre-commit-config.yaml'
+  #     - 'scripts/**'
+  #     - 'tools/**'
+  #     - '.github/workflows/pre-commit-docker.yml'
   workflow_dispatch: {}
 
 permissions:
