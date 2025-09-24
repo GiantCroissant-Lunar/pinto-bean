@@ -2,7 +2,7 @@ name: GitHub Projects v2 Auto Management
 
 on:
   issues:
-    types: [opened]
+    types: [opened, closed, reopened]
   workflow_dispatch:
     inputs:
       action:
@@ -75,6 +75,227 @@ jobs:
         }' -f projectId="$PROJECT_ID" -f contentId="$ISSUE_ID"
 
         echo "Issue #$ISSUE_NUMBER added to Project #$PROJECT_NUMBER"
+
+    - name: Update closed issue status
+      if: github.event_name == 'issues' && github.event.action == 'closed'
+      env:
+        GH_TOKEN: ${{ secrets.USE_PROJECT_V2_TOKEN }}
+      run: |
+        echo "Issue #${{ github.event.issue.number }} closed, updating project status..."
+
+        PROJECT_NUMBER=3
+        ISSUE_NUMBER=${{ github.event.issue.number }}
+
+        # Get project ID
+        PROJECT_ID=$(gh api graphql -f query='
+        query($login: String!) {
+          user(login: $login) {
+            projectV2(number: '$PROJECT_NUMBER') {
+              id
+            }
+          }
+        }' -f login=ApprenticeGC --jq '.data.user.projectV2.id')
+
+        echo "Project ID: $PROJECT_ID"
+
+        # Find the project item for this issue
+        ITEM_ID=$(gh api graphql -f query="
+        {
+          node(id: \"$PROJECT_ID\") {
+            ... on ProjectV2 {
+              items(first: 100) {
+                nodes {
+                  id
+                  content {
+                    ... on Issue {
+                      number
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }" --jq ".data.node.items.nodes[] | select(.content.number == $ISSUE_NUMBER) | .id")
+
+        if [ -z "$ITEM_ID" ]; then
+          echo "Issue #$ISSUE_NUMBER not found in project, adding it first..."
+          ISSUE_ID=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER --jq '.node_id')
+          gh api graphql -f query='
+          mutation($projectId: ID!, $contentId: ID!) {
+            addProjectV2ItemById(input: {
+              projectId: $projectId
+              contentId: $contentId
+            }) {
+              item {
+                id
+              }
+            }
+          }' -f projectId="$PROJECT_ID" -f contentId="$ISSUE_ID"
+
+          # Get the newly created item ID
+          ITEM_ID=$(gh api graphql -f query="
+          {
+            node(id: \"$PROJECT_ID\") {
+              ... on ProjectV2 {
+                items(first: 100) {
+                  nodes {
+                    id
+                    content {
+                      ... on Issue {
+                        number
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }" --jq ".data.node.items.nodes[] | select(.content.number == $ISSUE_NUMBER) | .id")
+        fi
+
+        echo "Project Item ID: $ITEM_ID"
+
+        # Get Status field and Done option (try common names)
+        STATUS_FIELD_DATA=$(gh api graphql -f query="
+        {
+          node(id: \"$PROJECT_ID\") {
+            ... on ProjectV2 {
+              fields(first: 20) {
+                nodes {
+                  ... on ProjectV2SingleSelectField {
+                    id
+                    name
+                    options {
+                      id
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }" --jq '.data.node.fields.nodes[] | select(.name | test("Status|status"; "i"))')
+
+        if [ -n "$STATUS_FIELD_DATA" ]; then
+          STATUS_FIELD_ID=$(echo "$STATUS_FIELD_DATA" | jq -r '.id')
+          # Try to find Done, Closed, or Complete option
+          DONE_OPTION_ID=$(echo "$STATUS_FIELD_DATA" | jq -r '.options[] | select(.name | test("Done|Closed|Complete|Finished"; "i")) | .id' | head -n1)
+
+          if [ -n "$DONE_OPTION_ID" ] && [ "$DONE_OPTION_ID" != "null" ]; then
+            echo "Updating status to Done..."
+            gh api graphql -f query='
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: {
+                    singleSelectOptionId: $optionId
+                  }
+                }
+              ) {
+                projectV2Item {
+                  id
+                }
+              }
+            }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$STATUS_FIELD_ID" -f optionId="$DONE_OPTION_ID"
+
+            echo "Issue #$ISSUE_NUMBER status updated to Done"
+          else
+            echo "No Done/Closed status option found in project"
+          fi
+        else
+          echo "No Status field found in project"
+        fi
+
+    - name: Update reopened issue status
+      if: github.event_name == 'issues' && github.event.action == 'reopened'
+      env:
+        GH_TOKEN: ${{ secrets.USE_PROJECT_V2_TOKEN }}
+      run: |
+        echo "Issue #${{ github.event.issue.number }} reopened, updating project status..."
+
+        PROJECT_NUMBER=3
+        ISSUE_NUMBER=${{ github.event.issue.number }}
+
+        # Get project ID
+        PROJECT_ID=$(gh api graphql -f query='
+        query($login: String!) {
+          user(login: $login) {
+            projectV2(number: '$PROJECT_NUMBER') {
+              id
+            }
+          }
+        }' -f login=ApprenticeGC --jq '.data.user.projectV2.id')
+
+        # Find the project item
+        ITEM_ID=$(gh api graphql -f query="
+        {
+          node(id: \"$PROJECT_ID\") {
+            ... on ProjectV2 {
+              items(first: 100) {
+                nodes {
+                  id
+                  content {
+                    ... on Issue {
+                      number
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }" --jq ".data.node.items.nodes[] | select(.content.number == $ISSUE_NUMBER) | .id")
+
+        if [ -n "$ITEM_ID" ]; then
+          # Get Status field and set to Todo/Backlog
+          STATUS_FIELD_DATA=$(gh api graphql -f query="
+          {
+            node(id: \"$PROJECT_ID\") {
+              ... on ProjectV2 {
+                fields(first: 20) {
+                  nodes {
+                    ... on ProjectV2SingleSelectField {
+                      id
+                      name
+                      options {
+                        id
+                        name
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }" --jq '.data.node.fields.nodes[] | select(.name | test("Status|status"; "i"))')
+
+          if [ -n "$STATUS_FIELD_DATA" ]; then
+            STATUS_FIELD_ID=$(echo "$STATUS_FIELD_DATA" | jq -r '.id')
+            TODO_OPTION_ID=$(echo "$STATUS_FIELD_DATA" | jq -r '.options[] | select(.name | test("Todo|To Do|Backlog|Open"; "i")) | .id' | head -n1)
+
+            if [ -n "$TODO_OPTION_ID" ] && [ "$TODO_OPTION_ID" != "null" ]; then
+              gh api graphql -f query='
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: {
+                      singleSelectOptionId: $optionId
+                    }
+                  }
+                ) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }' -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$STATUS_FIELD_ID" -f optionId="$TODO_OPTION_ID"
+
+              echo "Issue #$ISSUE_NUMBER status updated to Todo"
+            fi
+          fi
+        fi
 
     - name: List Projects v2
       if: github.event.inputs.action == 'list-projects'
