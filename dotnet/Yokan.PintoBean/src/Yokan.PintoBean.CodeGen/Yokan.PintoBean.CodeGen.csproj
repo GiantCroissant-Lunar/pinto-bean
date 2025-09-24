@@ -5,6 +5,9 @@
     <Description>Tier-2 incremental source generators and analyzers for Yokan PintoBean service platform</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Disable AOT settings for netstandard2.0 to avoid NETSDK1210 warnings -->
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>
