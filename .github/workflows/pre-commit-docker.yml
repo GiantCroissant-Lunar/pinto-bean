@@ -24,7 +24,7 @@ jobs:
     container:
       image: ghcr.io/giantcroissant-lunar/pinto-bean/precommit:latest
       credentials:
-        username: ${{ github.actor }}
+        username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 15
     steps:
