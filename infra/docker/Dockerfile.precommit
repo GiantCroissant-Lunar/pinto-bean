@@ -28,8 +28,9 @@ RUN apt-get update && apt-get install -y \
 # Copy installed packages from builder
 COPY --from=builder /root/.local /root/.local
 
-# Add local bin to PATH
+# Add local bin to PATH and local site-packages to PYTHONPATH
 ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/root/.local/lib/python3.11/site-packages:$PYTHONPATH
 
 # Verify installations
 RUN python --version && \
