@@ -1,5 +1,6 @@
 ﻿using ConsoleGame.App;
 using ConsoleGame.Contracts;
+using System.Globalization;
 
 Console.WriteLine("ConsoleGame.App – AssemblyLoadContext demo");
 var message = SelfLoader.LoadSelfAndInvoke();
@@ -35,13 +36,23 @@ else
 }
 
 using var cts = new CancellationTokenSource();
+var autoCancelEnv = Environment.GetEnvironmentVariable("CONSOLEGAME_AUTOCANCEL_MS");
+if (!string.IsNullOrWhiteSpace(autoCancelEnv) &&
+	int.TryParse(autoCancelEnv, NumberStyles.Integer, CultureInfo.InvariantCulture, out var autoCancelMs) &&
+	autoCancelMs > 0)
+{
+	cts.CancelAfter(TimeSpan.FromMilliseconds(autoCancelMs));
+	Console.WriteLine($"Auto-cancel enabled after {autoCancelMs} ms.");
+}
 Console.CancelKeyPress += (s, e) => { e.Cancel = true; cts.Cancel(); };
+var services = new DefaultServices();
 
 try
 {
 	if (File.Exists(pluginPath))
 	{
-		await SelfLoader.RunPluginAsync(pluginPath, services: new DefaultServices(), shutdownToken: cts.Token);
+		var result = await SelfLoader.RunPluginAsync(pluginPath, services: services, shutdownToken: cts.Token);
+		Console.WriteLine($"Plugin unloaded: {result.Unloaded} after {result.Duration.TotalMilliseconds:N0} ms");
 	}
 	else
 	{

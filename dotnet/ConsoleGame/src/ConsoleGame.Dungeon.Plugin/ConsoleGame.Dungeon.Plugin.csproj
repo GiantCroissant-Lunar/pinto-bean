@@ -3,6 +3,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\ConsoleGame.Contracts\ConsoleGame.Contracts.csproj" />
@@ -11,10 +12,7 @@
     <PackageReference Include="Terminal.Gui" Version="2.0.0" />
     <PackageReference Include="ReactiveUI" Version="20.1.1" />
     <PackageReference Include="System.Reactive" Version="6.0.0" />
-    <PackageReference Include="MessagePipe" Version="1.8.1" />
-    <PackageReference Include="Pure.DI" Version="2.2.12" PrivateAssets="all" />
+    <PackageReference Include="LibVLCSharp" Version="3.8.4" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.20" />
   </ItemGroup>
-  <PropertyGroup>
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-  </PropertyGroup>
 </Project>

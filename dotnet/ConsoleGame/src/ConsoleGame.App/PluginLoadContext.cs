@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 
@@ -23,6 +24,24 @@ internal sealed class PluginLoadContext : AssemblyLoadContext
         {
             return null; // fallback to default context resolution
         }
+
+        if (IsSharedAssembly(assemblyName))
+        {
+            var existing = AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(a => string.Equals(a.GetName().Name, assemblyName.Name, StringComparison.Ordinal));
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var sharedPath = _resolver.ResolveAssemblyToPath(assemblyName);
+            if (!string.IsNullOrWhiteSpace(sharedPath))
+            {
+                return Assembly.LoadFrom(sharedPath);
+            }
+
+            return Assembly.Load(assemblyName);
+        }
         var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
         if (assemblyPath != null)
         {
@@ -45,5 +64,16 @@ internal sealed class PluginLoadContext : AssemblyLoadContext
             return LoadUnmanagedDllFromPath(libraryPath);
         }
         return IntPtr.Zero;
+    }
+
+    private static bool IsSharedAssembly(AssemblyName assemblyName)
+    {
+        var name = assemblyName.Name;
+        return string.Equals(name, "LibVLCSharp", StringComparison.Ordinal)
+            || string.Equals(name, "LibVLCSharp.Shared", StringComparison.Ordinal)
+            || string.Equals(name, "Terminal.Gui", StringComparison.Ordinal)
+            || string.Equals(name, "ReactiveUI", StringComparison.Ordinal)
+            || string.Equals(name, "Splat", StringComparison.Ordinal)
+            || string.Equals(name, "System.Reactive", StringComparison.Ordinal);
     }
 }

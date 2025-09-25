@@ -182,7 +182,9 @@ jobs:
               if (!issueData.projectItems.nodes.length) {
                 console.log(`📋 Issue #${issueNumber} is not in any projects`);
 
-                if (eventName === 'issues' && action === 'opened') {
+                // Add to project for any relevant event
+                if ((eventName === 'issues' && action === 'opened') ||
+                    (eventName === 'pull_request' && targetStatus)) {
                   console.log(`🔗 Adding issue to Project #3...`);
 
                   // Add to project first
