@@ -192,7 +192,11 @@ public class PintoBeanCodeGen : IIncrementalGenerator
         sb.AppendLine($"    public {asyncModifier}{returnType} {methodName}({parameterList})");
         sb.AppendLine("    {");
 
-        // Create parameter array for aspect runtime
+        // Start operation tracking for telemetry
+        var operationName = $"{contractTypeName}.{methodName}";
+        sb.AppendLine($"        using var op = _aspectRuntime.StartOperation(\"{operationName}\");");
+        
+        // Also maintain EnterMethod for compatibility with existing telemetry systems
         var paramNames = method.Parameters.Select(p => p.Name).ToArray();
         var paramArray = paramNames.Length > 0
             ? $"new object?[] {{ {string.Join(", ", paramNames)} }}"
