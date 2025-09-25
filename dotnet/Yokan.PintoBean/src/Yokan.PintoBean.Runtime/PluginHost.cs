@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Threading.Tasks;
 
 namespace Yokan.PintoBean.Runtime;
@@ -110,6 +113,27 @@ public sealed class PluginHost : IPluginHost
 
         try
         {
+            // Perform contract version validation only if the plugin declares a contract version
+            if (!string.IsNullOrWhiteSpace(handle.Descriptor.ContractVersion))
+            {
+                if (!ContractVersioning.IsCompatible(handle.Descriptor.ContractVersion))
+                {
+                    var errorMessage = ContractVersioning.GetCompatibilityErrorMessage(pluginId, handle.Descriptor.ContractVersion);
+                    var versionException = new InvalidOperationException(errorMessage);
+                    handle.State = PluginState.Failed;
+                    handle.LastError = versionException;
+                    PluginFailed?.Invoke(this, new PluginFailedEventArgs(pluginId, "Activate", versionException));
+                    return false;
+                }
+
+                // Perform type identity validation for any loaded contract types
+                // This checks that contract interfaces/types come from Tier-1 assemblies in the default context
+                if (handle.LoadContext != null)
+                {
+                    await ValidateContractTypesAsync(pluginId, handle);
+                }
+            }
+
             await Task.Run(() =>
             {
                 handle.State = PluginState.Active;
@@ -236,6 +260,62 @@ public sealed class PluginHost : IPluginHost
         ThrowIfDisposed();
         
         return _plugins.ContainsKey(pluginId);
+    }
+
+    /// <summary>
+    /// Validates that any contract types used by the plugin come from Tier-1 assemblies in the default context.
+    /// </summary>
+    /// <param name="pluginId">The plugin ID for error reporting.</param>
+    /// <param name="handle">The plugin handle containing the load context.</param>
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access", Justification = "Plugin contract validation requires assembly analysis which is necessary for security")]
+    private async Task ValidateContractTypesAsync(string pluginId, PluginHandle handle)
+    {
+        // This is a basic implementation that can be extended based on specific contract discovery mechanisms
+        // For now, we'll validate any types that appear to be contracts based on common patterns
+        
+        await Task.Run(() =>
+        {
+            if (handle.LoadContext == null || handle.Instance == null)
+                return;
+
+            var pluginAssembly = handle.Instance.GetType().Assembly;
+            var referencedAssemblies = pluginAssembly.GetReferencedAssemblies();
+
+            // Check for contract assemblies in the plugin's dependencies
+            foreach (var referencedAssembly in referencedAssemblies)
+            {
+                var assemblyName = referencedAssembly.Name?.ToLowerInvariant() ?? "";
+                bool isContractAssembly = assemblyName.Contains("contracts") ||
+                                        assemblyName.Contains("models") ||
+                                        assemblyName.Contains("abstractions");
+
+                if (isContractAssembly)
+                {
+                    try
+                    {
+                        // Try to load the assembly and verify it's from the default context
+                        var loadedAssembly = Assembly.Load(referencedAssembly);
+                        var loadContext = AssemblyLoadContext.GetLoadContext(loadedAssembly);
+                        
+                        if (loadContext != AssemblyLoadContext.Default)
+                        {
+                            throw new InvalidOperationException(
+                                $"Plugin '{pluginId}' references contract assembly '{referencedAssembly.Name}' " +
+                                "that is not loaded in the default AssemblyLoadContext. " +
+                                "Contract assemblies must be loaded in the default context to ensure type identity.");
+                        }
+                    }
+                    catch (Exception ex) when (!(ex is InvalidOperationException))
+                    {
+                        // If we can't load the assembly for validation, that's also a problem
+                        throw new InvalidOperationException(
+                            $"Plugin '{pluginId}' references contract assembly '{referencedAssembly.Name}' " +
+                            "that cannot be validated for type identity. " +
+                            "Ensure all contract assemblies are properly available.", ex);
+                    }
+                }
+            }
+        });
     }
 
     /// <inheritdoc />

@@ -17,6 +17,7 @@ public sealed class FilePluginDiscovery : IPluginDiscovery
     private readonly string _manifestFileName;
     private readonly Version? _minimumVersion;
     private readonly string[]? _requiredCapabilities;
+    private readonly bool _validateContractVersion;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FilePluginDiscovery"/> class.
@@ -24,14 +25,17 @@ public sealed class FilePluginDiscovery : IPluginDiscovery
     /// <param name="manifestFileName">The name of the manifest file to search for. Defaults to "plugin.json".</param>
     /// <param name="minimumVersion">The minimum required plugin version. If null, no version validation is performed.</param>
     /// <param name="requiredCapabilities">The capabilities that must be present in valid plugins. If null, no capability validation is performed.</param>
+    /// <param name="validateContractVersion">Whether to validate contract version compatibility. Defaults to false for backwards compatibility.</param>
     public FilePluginDiscovery(
         string manifestFileName = "plugin.json",
         Version? minimumVersion = null,
-        string[]? requiredCapabilities = null)
+        string[]? requiredCapabilities = null,
+        bool validateContractVersion = false)
     {
         _manifestFileName = manifestFileName ?? throw new ArgumentNullException(nameof(manifestFileName));
         _minimumVersion = minimumVersion;
         _requiredCapabilities = requiredCapabilities;
+        _validateContractVersion = validateContractVersion;
     }
 
     /// <inheritdoc />
@@ -87,6 +91,10 @@ public sealed class FilePluginDiscovery : IPluginDiscovery
         if (_requiredCapabilities?.Length > 0 && !ValidateCapabilities(manifest.Capabilities))
             return null;
 
+        // Validate contract version if required
+        if (_validateContractVersion && !ValidateContractVersion(manifest.ContractVersion))
+            return null;
+
         // Convert relative assembly paths to absolute paths relative to the manifest directory
         var manifestDir = Path.GetDirectoryName(manifestPath)!;
         var assemblyPaths = manifest.Assemblies
@@ -98,7 +106,8 @@ public sealed class FilePluginDiscovery : IPluginDiscovery
         {
             Name = manifest.Name,
             Description = manifest.Description,
-            Author = manifest.Author
+            Author = manifest.Author,
+            ContractVersion = manifest.ContractVersion
         };
 
         // Create capabilities from manifest
@@ -145,5 +154,10 @@ public sealed class FilePluginDiscovery : IPluginDiscovery
 
         return _requiredCapabilities.All(required => 
             pluginCapabilities.Contains(required, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private bool ValidateContractVersion(string? contractVersion)
+    {
+        return ContractVersioning.IsCompatible(contractVersion);
     }
 }
