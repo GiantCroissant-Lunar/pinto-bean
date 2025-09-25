@@ -10,7 +10,7 @@ namespace Yokan.PintoBean.Runtime;
 /// <summary>
 /// Cross-cutting adapter for aspect-oriented concerns including telemetry,
 /// logging, metrics collection, and other observability features.
-/// Provides hooks for method entry/exit and exception handling.
+/// Provides hooks for method entry/exit, exception handling, and custom operation tracking.
 /// </summary>
 public interface IAspectRuntime
 {
