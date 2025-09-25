@@ -38,6 +38,11 @@ public class SelectionStrategyTelemetryTests
             RecordedMetrics.Add(new MetricRecord(name, value, tags?.ToDictionary(t => t.Key, t => t.Value) ?? new Dictionary<string, object>()));
         }
 
+        public IDisposable StartOperation(string operationName, IReadOnlyDictionary<string, object>? metadata = null)
+        {
+            return new TestContext();
+        }
+
         private class TestContext : IDisposable
         {
             public void Dispose() { }
@@ -205,6 +210,45 @@ public class SelectionStrategyTelemetryTests
 
         // Verify no-op behavior doesn't interfere with functionality
         Assert.Equal(SelectionStrategyType.PickOne, result.StrategyType);
+    }
+
+    [Fact]
+    public void IAspectRuntime_StartOperation_ShouldReturnDisposableContext()
+    {
+        // Arrange
+        var testRuntime = new TestAspectRuntime();
+        var metadata = new Dictionary<string, object>
+        {
+            ["operation_type"] = "custom",
+            ["user_id"] = "test_user"
+        };
+
+        // Act
+        using var context = testRuntime.StartOperation("test_operation", metadata);
+
+        // Assert
+        Assert.NotNull(context);
+        // Verify disposal doesn't throw
+        // The using statement will dispose the context when it goes out of scope
+    }
+
+    [Fact] 
+    public void NoOpAspectRuntime_StartOperation_ShouldReturnNoOpContext()
+    {
+        // Arrange
+        var noOpRuntime = NoOpAspectRuntime.Instance;
+        var metadata = new Dictionary<string, object>
+        {
+            ["test_key"] = "test_value"
+        };
+
+        // Act
+        using var context = noOpRuntime.StartOperation("noop_operation", metadata);
+
+        // Assert  
+        Assert.NotNull(context);
+        // Verify no-op doesn't interfere with functionality
+        // The using statement will dispose the context when it goes out of scope
     }
 
     private static IProviderRegistration CreateTestRegistration(ITestTelemetryService provider, string providerId)

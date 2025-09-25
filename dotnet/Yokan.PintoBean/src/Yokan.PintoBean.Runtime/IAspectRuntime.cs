@@ -1,6 +1,7 @@
 // Tier-3: Aspect runtime interface for cross-cutting concerns
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -43,6 +44,14 @@ public interface IAspectRuntime
     /// <param name="value">The metric value.</param>
     /// <param name="tags">Optional tags for categorization.</param>
     void RecordMetric(string name, double value, params (string Key, object Value)[] tags);
+
+    /// <summary>
+    /// Starts tracking a custom operation with optional metadata.
+    /// </summary>
+    /// <param name="operationName">The name of the operation being tracked.</param>
+    /// <param name="metadata">Optional metadata for the operation.</param>
+    /// <returns>A disposable context for tracking the operation's lifecycle.</returns>
+    IDisposable StartOperation(string operationName, IReadOnlyDictionary<string, object>? metadata = null);
 }
 
 /// <summary>
@@ -80,6 +89,12 @@ public sealed class NoOpAspectRuntime : IAspectRuntime
     public void RecordMetric(string name, double value, params (string Key, object Value)[] tags)
     {
         // No-op
+    }
+
+    /// <inheritdoc />
+    public IDisposable StartOperation(string operationName, IReadOnlyDictionary<string, object>? metadata = null)
+    {
+        return NoOpContext.Instance;
     }
 
     private sealed class NoOpContext : IDisposable
