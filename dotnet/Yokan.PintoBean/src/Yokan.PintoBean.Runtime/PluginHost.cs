@@ -15,16 +15,20 @@ namespace Yokan.PintoBean.Runtime;
 public sealed class PluginHost : IPluginHost
 {
     private readonly ConcurrentDictionary<string, PluginHandle> _plugins = new();
+    private readonly ConcurrentDictionary<string, List<IProviderRegistration>> _pluginProviders = new();
     private readonly Func<PluginDescriptor, ILoadContext> _loadContextFactory;
+    private readonly IServiceRegistry? _serviceRegistry;
     private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PluginHost"/> class.
     /// </summary>
     /// <param name="loadContextFactory">Factory to create load contexts for plugins. If null, uses FakeLoadContext.</param>
-    public PluginHost(Func<PluginDescriptor, ILoadContext>? loadContextFactory = null)
+    /// <param name="serviceRegistry">Optional service registry for provider registration. If null, provider registration is skipped.</param>
+    public PluginHost(Func<PluginDescriptor, ILoadContext>? loadContextFactory = null, IServiceRegistry? serviceRegistry = null)
     {
         _loadContextFactory = loadContextFactory ?? (descriptor => new FakeLoadContext(descriptor.Id));
+        _serviceRegistry = serviceRegistry;
     }
 
     /// <inheritdoc />
@@ -136,9 +140,55 @@ public sealed class PluginHost : IPluginHost
 
             await Task.Run(() =>
             {
+                // Instantiate plugin entry point if specified
+                if (handle.Instance == null && handle.Descriptor.Capabilities?.Metadata is { } metadata && metadata.ContainsKey("entryType"))
+                {
+                    var entryTypeName = metadata["entryType"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(entryTypeName) && handle.LoadContext != null && handle.LoadContext.TryGetType(entryTypeName!, out var entryType) && entryType != null)
+                    {
+                        try
+                        {
+                            handle.Instance = handle.LoadContext.CreateInstance(entryType);
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new InvalidOperationException($"Failed to instantiate plugin entry type '{entryTypeName}' for plugin '{pluginId}': {ex.Message}", ex);
+                        }
+                    }
+                }
+                
                 handle.State = PluginState.Active;
                 handle.ActivatedAt = DateTimeOffset.UtcNow;
             });
+            
+            // Register providers with service registry if available
+            if (_serviceRegistry != null && handle.Instance is IProviderHost providerHost)
+            {
+                var registrations = new List<IProviderRegistration>();
+                try
+                {
+                    foreach (var providerDescriptor in providerHost.GetProviders())
+                    {
+                        var registration = _serviceRegistry.Register(
+                            providerDescriptor.ServiceType,
+                            providerDescriptor.Provider,
+                            providerDescriptor.Capabilities);
+                        registrations.Add(registration);
+                    }
+                    
+                    // Track registrations for cleanup on deactivation
+                    _pluginProviders.TryAdd(pluginId, registrations);
+                }
+                catch (Exception ex)  
+                {
+                    // Cleanup any partial registrations on failure
+                    foreach (var registration in registrations)
+                    {
+                        _serviceRegistry.Unregister(registration);
+                    }
+                    throw new InvalidOperationException($"Failed to register providers for plugin '{pluginId}': {ex.Message}", ex);
+                }
+            }
             
             return true;
         }
@@ -188,6 +238,9 @@ public sealed class PluginHost : IPluginHost
                 handle.DeactivatedAt = DateTimeOffset.UtcNow;
             });
             
+            // Unregister providers from service registry
+            await UnregisterPluginProvidersAsync(pluginId);
+            
             return true;
         }
         catch (Exception ex)
@@ -219,6 +272,9 @@ public sealed class PluginHost : IPluginHost
             {
                 await quiesceable.QuiesceAsync();
             }
+
+            // Unregister providers from service registry
+            await UnregisterPluginProvidersAsync(pluginId);
 
             await Task.Run(() =>
             {
@@ -318,6 +374,32 @@ public sealed class PluginHost : IPluginHost
         });
     }
 
+    /// <summary>
+    /// Unregisters all providers associated with the specified plugin from the service registry.
+    /// </summary>
+    /// <param name="pluginId">The plugin ID whose providers should be unregistered.</param>
+    private async Task UnregisterPluginProvidersAsync(string pluginId)
+    {
+        if (_serviceRegistry == null || !_pluginProviders.TryRemove(pluginId, out var registrations))
+            return;
+
+        await Task.Run(() =>
+        {
+            foreach (var registration in registrations)
+            {
+                try
+                {
+                    _serviceRegistry.Unregister(registration);
+                }
+                catch (Exception)
+                {
+                    // Ignore errors during cleanup - registry may have changed state
+                    // The important thing is we tried to clean up
+                }
+            }
+        });
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -337,6 +419,7 @@ public sealed class PluginHost : IPluginHost
         }
 
         _plugins.Clear();
+        _pluginProviders.Clear();
         _disposed = true;
     }
 
