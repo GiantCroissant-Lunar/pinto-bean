@@ -434,6 +434,7 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
     private readonly IProviderSelectionCache<TService> _cache;
     private readonly IServiceRegistry? _registry;
     private readonly Func<IDictionary<string, object>?, string> _keyExtractor;
+    private readonly IReadOnlyDictionary<string, string>? _explicitShardMap;
     private readonly IAspectRuntime _aspectRuntime;
     private bool _disposed;
 
@@ -449,8 +450,27 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
         IServiceRegistry? registry = null,
         TimeSpan? cacheTtl = null,
         IAspectRuntime? aspectRuntime = null)
+        : this(keyExtractor, explicitShardMap: null, registry, cacheTtl, aspectRuntime)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the ShardedSelectionStrategy class with explicit shard mapping.
+    /// </summary>
+    /// <param name="keyExtractor">Function to extract shard key from selection metadata.</param>
+    /// <param name="explicitShardMap">Optional explicit mapping from shard keys to provider IDs. When provided, takes precedence over consistent hashing.</param>
+    /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
+    /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
+    public ShardedSelectionStrategy(
+        Func<IDictionary<string, object>?, string> keyExtractor,
+        IReadOnlyDictionary<string, string>? explicitShardMap,
+        IServiceRegistry? registry = null,
+        TimeSpan? cacheTtl = null,
+        IAspectRuntime? aspectRuntime = null)
     {
         _keyExtractor = keyExtractor ?? throw new ArgumentNullException(nameof(keyExtractor));
+        _explicitShardMap = explicitShardMap;
         _cache = new SelectionCache<TService>(cacheTtl);
         _registry = registry;
         _aspectRuntime = aspectRuntime ?? NoOpAspectRuntime.Instance;
@@ -501,7 +521,7 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
         }
 
         // Apply filtering and shard-based selection
-        var selected = SelectProviderByShard(context, shardKey);
+        var selected = SelectProviderByShard(context, shardKey, _explicitShardMap);
         var selectedProvider = (TService)selected.Provider;
 
         // Record target provider
@@ -550,9 +570,9 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
     }
 
     /// <summary>
-    /// Selects a provider based on shard key routing with consistent hashing.
+    /// Selects a provider based on shard key routing with explicit mapping support and consistent hashing fallback.
     /// </summary>
-    private static IProviderRegistration SelectProviderByShard(ISelectionContext<TService> context, string shardKey)
+    private static IProviderRegistration SelectProviderByShard(ISelectionContext<TService> context, string shardKey, IReadOnlyDictionary<string, string>? explicitShardMap)
     {
         var candidates = context.Registrations.AsEnumerable();
 
@@ -569,8 +589,8 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
                 $"No compatible providers found for service contract '{typeof(TService).Name}' after applying filters.");
         }
 
-        // Step 3: Consistent hashing based on shard key
-        return SelectByConsistentHashing(candidateList, shardKey);
+        // Step 3: Try explicit shard mapping first, then fallback to consistent hashing
+        return SelectByShardKey(candidateList, shardKey, explicitShardMap);
     }
 
     /// <summary>
@@ -607,6 +627,29 @@ public sealed class ShardedSelectionStrategy<TService> : ISelectionStrategy<TSer
     private static IEnumerable<IProviderRegistration> ApplyPlatformFilter(IEnumerable<IProviderRegistration> candidates)
     {
         return candidates.Where(r => PlatformDetector.IsCompatible(r.Capabilities.Platform));
+    }
+
+    /// <summary>
+    /// Selects provider using explicit shard mapping first, then falls back to consistent hashing.
+    /// </summary>
+    private static IProviderRegistration SelectByShardKey(IList<IProviderRegistration> candidates, string shardKey, IReadOnlyDictionary<string, string>? explicitShardMap)
+    {
+        // First, try explicit shard mapping if available
+        if (explicitShardMap != null && explicitShardMap.TryGetValue(shardKey, out var targetProviderId))
+        {
+            // Find the provider with the matching ProviderId
+            var explicitProvider = candidates.FirstOrDefault(r => r.Capabilities.ProviderId == targetProviderId);
+            if (explicitProvider != null)
+            {
+                return explicitProvider;
+            }
+            
+            // If explicit provider not found in candidates, fall through to consistent hashing
+            // This could happen if the provider is not available/compatible
+        }
+
+        // Fallback to consistent hashing when no explicit mapping or provider not found
+        return SelectByConsistentHashing(candidates, shardKey);
     }
 
     /// <summary>
@@ -762,6 +805,51 @@ public static class DefaultSelectionStrategies
         where TService : class
     {
         return new ShardedSelectionStrategy<TService>(keyExtractor, registry, cacheTtl, aspectRuntime);
+    }
+
+    /// <summary>
+    /// Creates a Sharded strategy for analytics with explicit shard mapping support.
+    /// </summary>
+    /// <typeparam name="TService">The service contract type.</typeparam>
+    /// <param name="explicitShardMap">Explicit mapping from shard keys to provider IDs. Takes precedence over consistent hashing.</param>
+    /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
+    /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
+    /// <returns>A Sharded selection strategy instance with explicit mapping and analytics key extraction.</returns>
+    public static ISelectionStrategy<TService> CreateAnalyticsShardedWithMap<TService>(
+        IReadOnlyDictionary<string, string> explicitShardMap,
+        IServiceRegistry? registry = null,
+        TimeSpan? cacheTtl = null,
+        IAspectRuntime? aspectRuntime = null)
+        where TService : class
+    {
+        return new ShardedSelectionStrategy<TService>(
+            ExtractAnalyticsShardKey,
+            explicitShardMap,
+            registry,
+            cacheTtl,
+            aspectRuntime);
+    }
+
+    /// <summary>
+    /// Creates a Sharded strategy with custom key extraction and explicit shard mapping support.
+    /// </summary>
+    /// <typeparam name="TService">The service contract type.</typeparam>
+    /// <param name="keyExtractor">Function to extract shard key from selection metadata.</param>
+    /// <param name="explicitShardMap">Explicit mapping from shard keys to provider IDs. Takes precedence over consistent hashing.</param>
+    /// <param name="registry">Optional service registry for cache invalidation on provider changes.</param>
+    /// <param name="cacheTtl">Optional TTL for cached selections. Defaults to 5 minutes.</param>
+    /// <param name="aspectRuntime">Optional aspect runtime for telemetry. Defaults to no-op.</param>
+    /// <returns>A Sharded selection strategy instance with custom key extraction and explicit mapping.</returns>
+    public static ISelectionStrategy<TService> CreateShardedWithMap<TService>(
+        Func<IDictionary<string, object>?, string> keyExtractor,
+        IReadOnlyDictionary<string, string> explicitShardMap,
+        IServiceRegistry? registry = null,
+        TimeSpan? cacheTtl = null,
+        IAspectRuntime? aspectRuntime = null)
+        where TService : class
+    {
+        return new ShardedSelectionStrategy<TService>(keyExtractor, explicitShardMap, registry, cacheTtl, aspectRuntime);
     }
 
     /// <summary>

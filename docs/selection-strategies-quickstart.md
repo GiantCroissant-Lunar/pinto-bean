@@ -58,15 +58,31 @@ await analyticsService.TrackEvent("player.level.complete", eventData);
 ```
 
 #### Sharded
-Routes by key extraction (e.g., event name prefix):
+Routes by key extraction (e.g., event name prefix) with support for explicit mapping:
 
-**Use case**: Load balancing, geographic routing, A/B testing
+**Use case**: Load balancing, geographic routing, A/B testing, deterministic provider assignment
 
 ```csharp
-// Route analytics by event prefix: "player.level.complete" → "player" shard
+// Basic sharded routing: uses consistent hashing based on event prefix
 var analyticsService = serviceProvider.GetService<IAnalyticsService>();
 await analyticsService.TrackEvent("player.level.complete", eventData);  // → Player shard
 await analyticsService.TrackEvent("system.startup", eventData);         // → System shard
+
+// Advanced: Explicit shard mapping with fallback to consistent hashing
+services.AddSelectionStrategies(options =>
+{
+    // Define explicit shard-to-provider mapping
+    var explicitShardMap = new Dictionary<string, string>
+    {
+        ["player"] = "UnityAnalyticsProvider",
+        ["system"] = "FirebaseAnalyticsProvider"
+        // Other shards (e.g., "inventory") will use consistent hashing
+    };
+    
+    options.UseStrategy<IAnalyticsService>(
+        DefaultSelectionStrategies.CreateAnalyticsShardedWithMap<IAnalyticsService>(explicitShardMap)
+    );
+});
 ```
 
 ## Default Category Mappings
@@ -248,7 +264,10 @@ A: Ensure you're calling `AddSelectionStrategies()` before registering service i
 A: Verify your service contracts return `Task<T>` or `ValueTask<T>` for proper aggregation.
 
 **Q: Sharded routing seems random**
-A: Check your key extraction logic - default uses event name prefix before first dot.
+A: Check your key extraction logic - default uses event name prefix before first dot. For deterministic routing, consider using explicit shard maps.
+
+**Q: How do I ensure specific shards always go to specific providers?**
+A: Use explicit shard mapping with `CreateAnalyticsShardedWithMap` or `CreateShardedWithMap` factory methods. Unmapped shards will fallback to consistent hashing.
 
 **Q: Performance issues with FanOut**
 A: Consider using circuit breakers via resilience patterns, or switch to PickOne for high-frequency operations.

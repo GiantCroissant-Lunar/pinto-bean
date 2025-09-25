@@ -25,7 +25,13 @@ Invoke *all* matched providers; aggregate results/failures:
 - Aggregate (for Task/ValueTask return types; failures folded with policy).
 
 ### Sharded
-Route by key `Func<Request,TKey>`. Default for analytics: **event name prefix before the first dot** (e.g., `player.level.complete` → `player`). Overridable via policy assets.
+Route by key `Func<Request,TKey>`. Default for analytics: **event name prefix before the first dot** (e.g., `player.level.complete` → `player`). 
+
+**Enhanced with Explicit Mapping Support**: Supports explicit shard-to-provider mappings that take precedence over consistent hashing. When a shard key is found in the explicit map, the specified provider is selected directly. Unmapped keys fallback to consistent hashing for automatic load balancing.
+
+Examples:
+- Consistent hashing only: `CreateAnalyticsSharded<T>()`  
+- With explicit mapping: `CreateAnalyticsShardedWithMap<T>(explicitMap)` where `explicitMap["player"] = "ProviderA"`
 
 ## Category defaults (overridable in Settings/DI)
 - **Analytics** → **FanOut** (common to send to Unity Analytics + Firebase), optional `Sharded` for fine routing.

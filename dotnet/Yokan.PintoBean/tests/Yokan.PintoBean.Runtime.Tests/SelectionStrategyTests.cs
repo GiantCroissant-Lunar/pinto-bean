@@ -787,6 +787,150 @@ public class SelectionStrategyTests
         Assert.Equal(typeof(ITestSelectionService), ((ISelectionStrategy)strategy).ServiceType);
     }
 
+    [Fact]
+    public void ShardedSelectionStrategy_WithExplicitShardMap_UsesExplicitMapping()
+    {
+        // Arrange
+        var providerA = new TestSelectionService("ProviderA");
+        var providerB = new TestSelectionService("ProviderB");
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistrationWithId(providerA, "ProviderA", Priority.Normal, DateTime.UtcNow),
+            CreateRegistrationWithId(providerB, "ProviderB", Priority.Normal, DateTime.UtcNow.AddSeconds(1))
+        };
+
+        var explicitShardMap = new Dictionary<string, string>
+        {
+            ["player"] = "ProviderA",
+            ["system"] = "ProviderB"
+        };
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "player.level.complete"
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsShardedWithMap<ITestSelectionService>(explicitShardMap);
+
+        // Act
+        var result = strategy.SelectProviders(context);
+
+        // Assert
+        Assert.Single(result.SelectedProviders);
+        var selectedProvider = result.SelectedProviders.First();
+        Assert.Equal("ProviderA", selectedProvider.GetName());
+        Assert.Equal(SelectionStrategyType.Sharded, result.StrategyType);
+        Assert.NotNull(result.SelectionMetadata);
+        Assert.Equal("player", result.SelectionMetadata["ShardKey"]);
+        Assert.Equal("ProviderA", result.SelectionMetadata["ProviderId"]);
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_WithExplicitShardMap_FallsBackToHashingWhenNotInMap()
+    {
+        // Arrange
+        var providerA = new TestSelectionService("ProviderA");
+        var providerB = new TestSelectionService("ProviderB");
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistrationWithId(providerA, "ProviderA", Priority.Normal, DateTime.UtcNow),
+            CreateRegistrationWithId(providerB, "ProviderB", Priority.Normal, DateTime.UtcNow.AddSeconds(1))
+        };
+
+        var explicitShardMap = new Dictionary<string, string>
+        {
+            ["player"] = "ProviderA"
+            // "inventory" is not in the map, should fallback to hashing
+        };
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "inventory.item.collected"
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsShardedWithMap<ITestSelectionService>(explicitShardMap);
+
+        // Act
+        var result = strategy.SelectProviders(context);
+
+        // Assert
+        Assert.Single(result.SelectedProviders);
+        Assert.Equal(SelectionStrategyType.Sharded, result.StrategyType);
+        Assert.NotNull(result.SelectionMetadata);
+        Assert.Equal("inventory", result.SelectionMetadata["ShardKey"]);
+        // Should consistently select the same provider for the same shard key "inventory"
+        var selectedProvider = result.SelectedProviders.First();
+        Assert.NotNull(selectedProvider);
+        
+        // Run multiple times to verify consistent selection
+        for (int i = 0; i < 5; i++)
+        {
+            var repeatResult = strategy.SelectProviders(context);
+            Assert.Single(repeatResult.SelectedProviders);
+            Assert.Equal(selectedProvider.GetName(), repeatResult.SelectedProviders.First().GetName());
+        }
+    }
+
+    [Fact]
+    public void ShardedSelectionStrategy_WithExplicitShardMap_FallsBackWhenProviderNotAvailable()
+    {
+        // Arrange
+        var providerA = new TestSelectionService("ProviderA");
+        var providerB = new TestSelectionService("ProviderB");
+        var registrations = new List<IProviderRegistration>
+        {
+            CreateRegistrationWithId(providerA, "ProviderA", Priority.Normal, DateTime.UtcNow),
+            CreateRegistrationWithId(providerB, "ProviderB", Priority.Normal, DateTime.UtcNow.AddSeconds(1))
+        };
+
+        var explicitShardMap = new Dictionary<string, string>
+        {
+            ["player"] = "ProviderC"  // ProviderC not in registrations
+        };
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = "player.level.complete"
+        };
+
+        var context = new SelectionContext<ITestSelectionService>(registrations, metadata);
+        var strategy = DefaultSelectionStrategies.CreateAnalyticsShardedWithMap<ITestSelectionService>(explicitShardMap);
+
+        // Act
+        var result = strategy.SelectProviders(context);
+
+        // Assert
+        Assert.Single(result.SelectedProviders);
+        Assert.Equal(SelectionStrategyType.Sharded, result.StrategyType);
+        Assert.NotNull(result.SelectionMetadata);
+        Assert.Equal("player", result.SelectionMetadata["ShardKey"]);
+        // Should fallback to consistent hashing when explicit provider is not available
+        var selectedProvider = result.SelectedProviders.First();
+        Assert.True(selectedProvider.GetName() == "ProviderA" || selectedProvider.GetName() == "ProviderB");
+    }
+
+    [Fact]
+    public void DefaultSelectionStrategies_CreateShardedWithMap_ReturnsShardedStrategyWithExplicitMap()
+    {
+        // Arrange
+        var explicitShardMap = new Dictionary<string, string>
+        {
+            ["test"] = "TestProvider"
+        };
+
+        Func<IDictionary<string, object>?, string> keyExtractor = metadata => "test";
+
+        // Act
+        var strategy = DefaultSelectionStrategies.CreateShardedWithMap<ITestSelectionService>(keyExtractor, explicitShardMap);
+
+        // Assert
+        Assert.NotNull(strategy);
+        Assert.Equal(SelectionStrategyType.Sharded, strategy.StrategyType);
+        Assert.Equal(typeof(ITestSelectionService), ((ISelectionStrategy)strategy).ServiceType);
+    }
+
     private static IProviderRegistration CreateRegistration(
         ITestSelectionService provider,
         Priority priority,
@@ -795,6 +939,29 @@ public class SelectionStrategyTests
         var capabilities = new ProviderCapabilities
         {
             ProviderId = $"test-provider-{Guid.NewGuid()}",
+            Priority = priority,
+            RegisteredAt = registeredAt,
+            Platform = Platform.Any
+        };
+
+        return new TestProviderRegistration
+        {
+            ServiceType = typeof(ITestSelectionService),
+            Provider = provider,
+            Capabilities = capabilities,
+            IsActive = true
+        };
+    }
+
+    private static IProviderRegistration CreateRegistrationWithId(
+        ITestSelectionService provider,
+        string providerId,
+        Priority priority,
+        DateTime registeredAt)
+    {
+        var capabilities = new ProviderCapabilities
+        {
+            ProviderId = providerId,
             Priority = priority,
             RegisteredAt = registeredAt,
             Platform = Platform.Any
