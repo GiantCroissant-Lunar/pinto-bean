@@ -15,344 +15,40 @@ jobs:
   sync-project-status:
     runs-on: ubuntu-latest
     steps:
-      - name: Sync issue status with Project v2
-        uses: actions/github-script@v8
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
         with:
-          github-token: ${{ secrets.USE_PROJECT_V2_TOKEN }}
-          script: |
-            const { owner, repo } = context.repo;
-            const eventName = context.eventName;
-            const action = context.payload.action;
+          python-version: '3.11'
+          cache: 'pip'
 
-            let issueNumber, issueId, issueTitle;
-            let targetStatus = null;
+      - name: Install Python dependencies
+        run: |
+          pip install -r scripts/python/requirements.txt
 
-            if (eventName === 'issues') {
-              const issue = context.payload.issue;
-              issueNumber = issue.number;
-              issueId = issue.id;
-              issueTitle = issue.title;
+      - name: Update Project Status (Issues)
+        if: github.event_name == 'issues'
+        env:
+          GITHUB_TOKEN: ${{ secrets.USE_PROJECT_V2_TOKEN }}
+        run: |
+          python scripts/python/update_project_status.py \
+            --event-name issues \
+            --action "${{ github.event.action }}" \
+            --issue-number "${{ github.event.issue.number }}" \
+            --assignees ${{ join(github.event.issue.assignees.*.login, ' ') }}
 
-              console.log(`🔍 Processing issue #${issueNumber}: ${issueTitle}`);
-              console.log(`📝 Issue action: ${action}`);
-
-              if (action === 'opened') {
-                targetStatus = 'Backlog';
-                console.log(`🆕 Issue opened → Moving to "Backlog"`);
-              } else if (action === 'assigned') {
-                targetStatus = 'Ready';
-                console.log(`👤 Issue assigned → Moving to "Ready"`);
-              } else if (action === 'unassigned') {
-                // Check if issue still has assignees
-                if (issue.assignees && issue.assignees.length === 0) {
-                  targetStatus = 'Backlog';
-                  console.log(`👤 Issue unassigned (no assignees left) → Moving to "Backlog"`);
-                } else {
-                  console.log(`👤 Issue unassigned but still has assignees → No status change`);
-                  return;
-                }
-              } else if (action === 'closed') {
-                targetStatus = 'Done';
-                console.log(`✅ Issue closed → Moving to "Done"`);
-              } else if (action === 'reopened') {
-                targetStatus = 'Backlog';
-                console.log(`🔄 Issue reopened → Moving to "Backlog"`);
-              }
-            } else if (eventName === 'pull_request') {
-              const pullRequest = context.payload.pull_request;
-              issueNumber = await getLinkedIssueNumber(github, owner, repo, pullRequest);
-
-              if (!issueNumber) {
-                console.log('ℹ️ No linked issue found for this pull request');
-                return;
-              }
-
-              console.log(`🔍 Processing PR #${pullRequest.number} linked to issue #${issueNumber}`);
-              console.log(`📝 PR action: ${action}`);
-
-              if (action === 'opened' && !pullRequest.draft) {
-                targetStatus = 'In review';
-                console.log(`📋 PR opened (ready for review) → Moving to "In review"`);
-              } else if (action === 'opened' && pullRequest.draft) {
-                targetStatus = 'In progress';
-                console.log(`📋 PR opened (draft) → Moving to "In progress"`);
-              } else if (action === 'ready_for_review') {
-                targetStatus = 'In review';
-                console.log(`👀 PR ready for review → Moving to "In review"`);
-              } else if (action === 'converted_to_draft') {
-                targetStatus = 'In progress';
-                console.log(`📝 PR converted to draft → Moving to "In progress"`);
-              } else if (action === 'closed' && pullRequest.merged) {
-                targetStatus = 'Done';
-                console.log(`✅ PR merged → Moving to "Done"`);
-              }
-            }
-
-            if (!targetStatus) {
-              console.log('ℹ️ No status change needed for this action');
-              return;
-            }
-
-            // Helper function to find linked issue from PR
-            async function getLinkedIssueNumber(github, owner, repo, pullRequest) {
-              // Check PR body for issue references like "fixes #123", "closes #456"
-              const body = pullRequest.body || '';
-              const issueMatches = body.match(/(?:fix(?:es)?|close(?:s)?|resolve(?:s)?)\s+#(\d+)/gi);
-
-              if (issueMatches && issueMatches.length > 0) {
-                const match = issueMatches[0].match(/#(\d+)/);
-                if (match) {
-                  return parseInt(match[1]);
-                }
-              }
-
-              // Check for timeline events that link issues
-              try {
-                const timelineQuery = `
-                  query($owner: String!, $repo: String!, $number: Int!) {
-                    repository(owner: $owner, name: $repo) {
-                      pullRequest(number: $number) {
-                        closingIssuesReferences(first: 10) {
-                          nodes {
-                            number
-                          }
-                        }
-                      }
-                    }
-                  }
-                `;
-
-                const response = await github.graphql(timelineQuery, {
-                  owner,
-                  repo,
-                  number: pullRequest.number
-                });
-
-                if (response.repository.pullRequest.closingIssuesReferences.nodes.length > 0) {
-                  return response.repository.pullRequest.closingIssuesReferences.nodes[0].number;
-                }
-              } catch (error) {
-                console.log('Could not fetch closing issues references:', error.message);
-              }
-
-              return null;
-            }
-
-            if (!issueNumber) {
-              console.log('ℹ️ No issue number available');
-              return;
-            }
-
-            try {
-              // Get issue and its project items
-              const issueQuery = `
-                query($owner: String!, $repo: String!, $number: Int!) {
-                  repository(owner: $owner, name: $repo) {
-                    issue(number: $number) {
-                      id
-                      title
-                      assignees(first: 10) {
-                        totalCount
-                      }
-                      projectItems(first: 10) {
-                        nodes {
-                          id
-                          project {
-                            id
-                            title
-                            number
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              `;
-
-              const issueResponse = await github.graphql(issueQuery, {
-                owner,
-                repo,
-                number: issueNumber
-              });
-
-              const issueData = issueResponse.repository.issue;
-              console.log(`✅ Found issue: ${issueData.title}`);
-              console.log(`👥 Assignees count: ${issueData.assignees.totalCount}`);
-
-              if (!issueData.projectItems.nodes.length) {
-                console.log(`📋 Issue #${issueNumber} is not in any projects`);
-
-                if (eventName === 'issues' && action === 'opened') {
-                  console.log(`🔗 Adding issue to Project #3...`);
-
-                  // Add to project first
-                  const addToProjectMutation = `
-                    mutation($projectId: ID!, $contentId: ID!) {
-                      addProjectV2ItemById(input: {
-                        projectId: $projectId
-                        contentId: $contentId
-                      }) {
-                        item {
-                          id
-                          project {
-                            id
-                            title
-                            number
-                          }
-                        }
-                      }
-                    }
-                  `;
-
-                  // Get project ID for Project #3
-                  const projectQuery = `
-                    query($login: String!) {
-                      user(login: $login) {
-                        projectV2(number: 3) {
-                          id
-                          title
-                        }
-                      }
-                    }
-                  `;
-
-                  const projectResponse = await github.graphql(projectQuery, {
-                    login: 'ApprenticeGC'
-                  });
-
-                  const projectId = projectResponse.user.projectV2.id;
-                  console.log(`🎯 Found Project #3: ${projectResponse.user.projectV2.title}`);
-
-                  // Add issue to project
-                  const addResponse = await github.graphql(addToProjectMutation, {
-                    projectId: projectId,
-                    contentId: issueData.id
-                  });
-
-                  console.log(`✅ Added issue to project: ${addResponse.addProjectV2ItemById.item.project.title}`);
-
-                  // Update issueData to include the new project item
-                  issueData.projectItems.nodes.push(addResponse.addProjectV2ItemById.item);
-                } else {
-                  console.log(`ℹ️ Issue not in projects and action is ${action}, skipping`);
-                  return;
-                }
-              }
-
-              // Update status in each project
-              for (const projectItem of issueData.projectItems.nodes) {
-                const project = projectItem.project;
-                console.log(`📊 Processing project: ${project.title} (#${project.number})`);
-
-                // Get project Status field
-                const fieldsQuery = `
-                  query($projectId: ID!) {
-                    node(id: $projectId) {
-                      ... on ProjectV2 {
-                        fields(first: 20) {
-                          nodes {
-                            ... on ProjectV2SingleSelectField {
-                              id
-                              name
-                              options {
-                                id
-                                name
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                `;
-
-                const fieldsResponse = await github.graphql(fieldsQuery, {
-                  projectId: project.id
-                });
-
-                const statusField = fieldsResponse.node.fields.nodes.find(
-                  field => field.name && field.name.toLowerCase().includes('status')
-                );
-
-                if (!statusField) {
-                  console.log(`⚠️ No Status field found in project ${project.title}`);
-                  console.log(`📋 Available fields: ${fieldsResponse.node.fields.nodes.map(f => f.name || 'unnamed').join(', ')}`);
-                  continue;
-                }
-
-                console.log(`🎯 Found Status field: ${statusField.name}`);
-                console.log(`📝 Available options: ${statusField.options.map(o => o.name).join(', ')}`);
-
-                // Find matching status option (flexible matching)
-                let statusOption = statusField.options.find(
-                  option => option.name === targetStatus
-                );
-
-                // If exact match not found, try variations
-                if (!statusOption) {
-                  const statusMap = {
-                    'Backlog': ['Todo', 'To Do', 'Open', 'New', 'Triage'],
-                    'Ready': ['Todo', 'To Do', 'Assigned', 'Ready to Start'],
-                    'In progress': ['In Progress', 'Working', 'Development', 'In Development'],
-                    'In review': ['In Review', 'Review', 'Code Review', 'Reviewing'],
-                    'Done': ['Complete', 'Completed', 'Finished', 'Closed', 'Resolved']
-                  };
-
-                  const alternatives = statusMap[targetStatus] || [];
-                  for (const alt of alternatives) {
-                    statusOption = statusField.options.find(
-                      option => option.name === alt
-                    );
-                    if (statusOption) {
-                      console.log(`🔄 Using alternative status: ${alt} instead of ${targetStatus}`);
-                      break;
-                    }
-                  }
-                }
-
-                if (!statusOption) {
-                  console.log(`⚠️ Status option "${targetStatus}" not found in project ${project.title}`);
-                  console.log(`💡 Consider adding "${targetStatus}" to your project status options`);
-                  continue;
-                }
-
-                console.log(`🎯 Using status option: ${statusOption.name} (${statusOption.id})`);
-
-                // Update project item status
-                const updateMutation = `
-                  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-                    updateProjectV2ItemFieldValue(
-                      input: {
-                        projectId: $projectId
-                        itemId: $itemId
-                        fieldId: $fieldId
-                        value: {
-                          singleSelectOptionId: $optionId
-                        }
-                      }
-                    ) {
-                      projectV2Item {
-                        id
-                      }
-                    }
-                  }
-                `;
-
-                await github.graphql(updateMutation, {
-                  projectId: project.id,
-                  itemId: projectItem.id,
-                  fieldId: statusField.id,
-                  optionId: statusOption.id
-                });
-
-                console.log(`✅ Updated project ${project.title}: Status set to "${statusOption.name}"`);
-                console.log(`📊 Project: ${project.title} | Status: ${statusOption.name} | Trigger: ${eventName} ${action}`);
-              }
-
-            } catch (error) {
-              console.error(`❌ Error updating issue #${issueNumber}:`, error);
-              console.error(`❌ Error details: ${error.message}`);
-              // Note: Cannot add comment due to permission restrictions
-            }
-
-            console.log('🎯 Project Status Sync Complete!');
+      - name: Update Project Status (Pull Requests)
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.USE_PROJECT_V2_TOKEN }}
+        run: |
+          python scripts/python/update_project_status.py \
+            --event-name pull_request \
+            --action "${{ github.event.action }}" \
+            --pr-number "${{ github.event.pull_request.number }}" \
+            --pr-title "${{ github.event.pull_request.title }}" \
+            --pr-body "${{ github.event.pull_request.body }}" \
+            ${{ github.event.pull_request.draft && '--is-draft' || '' }} \
+            ${{ github.event.pull_request.merged && '--is-merged' || '' }}

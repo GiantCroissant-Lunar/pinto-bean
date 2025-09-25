@@ -1,0 +1,5 @@
+ConsoleGame.App – AssemblyLoadContext demo
+Primary: Hello from ConsoleGame.App | Loaded: Hello from ConsoleGame.App | Contexts: primary=Default, copy=SelfCopyContext
+Using plugin from env: d:\lunar-horse\personal-work\yokan-projects\pinto-bean\dotnet\ConsoleGame\src\ConsoleGame.Dungeon.Plugin\bin\Debug\net9.0\ConsoleGame.Dungeon.Plugin.dll 
+Auto-cancel enabled after 1500 ms.
+Runtime plugin error: InvalidOperationException: No service for type 'MessagePipe.EventFactory' has been registered.

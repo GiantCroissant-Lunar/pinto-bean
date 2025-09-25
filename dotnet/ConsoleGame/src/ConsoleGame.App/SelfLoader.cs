@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Threading;
 using ConsoleGame.Contracts;
 using System.Linq;
 
@@ -82,20 +84,24 @@ public static class SelfLoader
 
     /// <summary>
     /// Load a plugin assembly in a collectible context, set up its plugin context, call optional ConfigureAsync,
-    /// and if a RunAsync method exists, await it until completion or cancellation.
+    /// and if a RunAsync method exists, await it until completion or cancellation. Returns details about unload verification.
     /// </summary>
-    public static async Task RunPluginAsync(string pluginAssemblyPath, IServiceProvider services, CancellationToken shutdownToken = default)
+    public static async Task<PluginRunResult> RunPluginAsync(string pluginAssemblyPath, IServiceProvider services, CancellationToken shutdownToken = default)
     {
         if (string.IsNullOrWhiteSpace(pluginAssemblyPath)) throw new ArgumentException("pluginAssemblyPath is required", nameof(pluginAssemblyPath));
 
-        var alc = new PluginLoadContext(pluginAssemblyPath);
+        PluginLoadContext? alc = new PluginLoadContext(pluginAssemblyPath);
+        var alcWeakRef = new WeakReference(alc, trackResurrection: false);
+        Assembly? asm = null;
+        Type? pluginType = null;
+        object? instance = null;
         try
         {
-            var asm = alc.LoadFromAssemblyPath(pluginAssemblyPath);
+            asm = alc.LoadFromAssemblyPath(pluginAssemblyPath);
 
             // Find first concrete type implementing ConsoleGame.Contracts.IPlugin from the default context
             var pluginContract = typeof(IPlugin);
-            var pluginType = asm
+            pluginType = asm
                 .GetTypes()
                 .FirstOrDefault(t => t.IsClass && !t.IsAbstract && pluginContract.IsAssignableFrom(t));
             if (pluginType == null)
@@ -103,7 +109,7 @@ public static class SelfLoader
                 throw new InvalidOperationException($"No type implementing {pluginContract.FullName} was found in {Path.GetFileName(pluginAssemblyPath)}.");
             }
 
-            var instance = Activator.CreateInstance(pluginType) ?? throw new InvalidOperationException($"Failed to create instance of {pluginType.FullName}");
+            instance = Activator.CreateInstance(pluginType) ?? throw new InvalidOperationException($"Failed to create instance of {pluginType.FullName}");
 
             // Create and assign plugin context if supported
             var pluginDir = Path.GetDirectoryName(pluginAssemblyPath) ?? AppContext.BaseDirectory;
@@ -143,8 +149,47 @@ public static class SelfLoader
         }
         finally
         {
-            alc.Unload();
+            if (instance is IDisposable disposable)
+            {
+                try { disposable.Dispose(); } catch { }
+            }
+            instance = null;
+            pluginType = null;
+            asm = null;
+
+            alc?.Unload();
         }
+
+        alc = null;
+
+        if (!WaitForUnload(alcWeakRef, out var elapsed, attempts: 40, delay: TimeSpan.FromMilliseconds(250)))
+        {
+            var debugEnv = Environment.GetEnvironmentVariable("CONSOLEGAME_DEBUG_UNLOAD");
+            if (!string.IsNullOrWhiteSpace(debugEnv) && debugEnv.Trim() == "1")
+            {
+                Console.WriteLine("[Unload] Collectible AssemblyLoadContexts still alive:");
+                var trackedCtx = alcWeakRef.Target as AssemblyLoadContext;
+                if (trackedCtx != null)
+                {
+                    Console.WriteLine($"  - (tracked) {trackedCtx.Name ?? "<unnamed>"}, Assemblies={trackedCtx.Assemblies.Count()}");
+                    foreach (var assembly in trackedCtx.Assemblies.OrderBy(a => a.FullName, StringComparer.Ordinal))
+                    {
+                        Console.WriteLine($"      * {assembly.FullName}");
+                    }
+                }
+                foreach (var ctx in AssemblyLoadContext.All.Where(c => c.IsCollectible))
+                {
+                    Console.WriteLine($"  - {ctx.Name ?? "<unnamed>"}, IsAlive={alcWeakRef.IsAlive}");
+                    foreach (var assembly in ctx.Assemblies.OrderBy(a => a.FullName, StringComparer.Ordinal))
+                    {
+                        Console.WriteLine($"      * {assembly.FullName}");
+                    }
+                }
+            }
+            return new PluginRunResult(false, elapsed);
+        }
+
+        return new PluginRunResult(true, elapsed);
     }
 
     private static async Task InvokeOptionalAsync(object instance, Type type, string methodName, CancellationToken token)
@@ -182,4 +227,39 @@ public static class SelfLoader
             return Task.CompletedTask;
         }
     }
+
+    private static bool WaitForUnload(WeakReference alcReference, out TimeSpan elapsed, int attempts, TimeSpan delay)
+    {
+        var sw = Stopwatch.StartNew();
+        var unloaded = false;
+        try
+        {
+            for (int i = 0; i < attempts; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+
+                if (!alcReference.IsAlive)
+                {
+                    unloaded = true;
+                    break;
+                }
+
+                if (delay > TimeSpan.Zero)
+                {
+                    Thread.Sleep(delay);
+                }
+            }
+
+            return unloaded || !alcReference.IsAlive;
+        }
+        finally
+        {
+            sw.Stop();
+            elapsed = sw.Elapsed;
+        }
+    }
 }
+
+public readonly record struct PluginRunResult(bool Unloaded, TimeSpan Duration);
