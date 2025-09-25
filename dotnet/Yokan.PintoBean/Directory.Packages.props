@@ -35,5 +35,10 @@
 
     <!-- Benchmarking packages -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.13.12" />
+
+    <!-- OpenTelemetry packages -->
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.9.0" />
   </ItemGroup>
 </Project>

@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Polly" />
     <PackageReference Include="Polly.Extensions.Http" />
+    <PackageReference Include="OpenTelemetry.Api" />
   </ItemGroup>
 
 </Project>

@@ -402,4 +402,39 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Adds the OpenTelemetry-backed aspect runtime to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="sourceName">The name of the ActivitySource for tracing.</param>
+    /// <param name="meterName">The name of the Meter for metrics.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when services, sourceName, or meterName is null.</exception>
+    public static IServiceCollection AddOpenTelemetryAspectRuntime(this IServiceCollection services, string sourceName, string meterName)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (sourceName == null) throw new ArgumentNullException(nameof(sourceName));
+        if (meterName == null) throw new ArgumentNullException(nameof(meterName));
+
+        services.TryAddSingleton<IAspectRuntime>(serviceProvider => 
+            new OtelAspectRuntime(sourceName, meterName));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the no-operation aspect runtime to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when services is null.</exception>
+    public static IServiceCollection AddNoOpAspectRuntime(this IServiceCollection services)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        services.TryAddSingleton<IAspectRuntime>(NoOpAspectRuntime.Instance);
+
+        return services;
+    }
 }
