@@ -59,6 +59,13 @@ public sealed class PluginManifest
     public string? Author { get; set; }
 
     /// <summary>
+    /// Gets or sets the contract version this plugin was compiled against.
+    /// Used for compatibility validation during plugin loading.
+    /// </summary>
+    [JsonPropertyName("contractVersion")]
+    public string? ContractVersion { get; set; }
+
+    /// <summary>
     /// Validates that the manifest contains required fields.
     /// </summary>
     /// <returns>True if the manifest is valid, false otherwise.</returns>

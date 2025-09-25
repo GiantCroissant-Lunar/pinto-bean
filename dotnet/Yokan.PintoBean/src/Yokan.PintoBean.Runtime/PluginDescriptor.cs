@@ -80,6 +80,12 @@ public sealed class PluginDescriptor
     /// </summary>
     public string? Author { get; set; }
 
+    /// <summary>
+    /// Gets or sets the contract version this plugin was compiled against.
+    /// Used for compatibility validation during plugin loading.
+    /// </summary>
+    public string? ContractVersion { get; set; }
+
     /// <inheritdoc />
     public override string ToString() => $"{Id} v{Version}";
 
