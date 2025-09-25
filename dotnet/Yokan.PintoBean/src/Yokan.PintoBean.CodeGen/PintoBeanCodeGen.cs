@@ -192,15 +192,9 @@ public class PintoBeanCodeGen : IIncrementalGenerator
         sb.AppendLine($"    public {asyncModifier}{returnType} {methodName}({parameterList})");
         sb.AppendLine("    {");
 
-        // Create parameter array for aspect runtime
-        var paramNames = method.Parameters.Select(p => p.Name).ToArray();
-        var paramArray = paramNames.Length > 0
-            ? $"new object?[] {{ {string.Join(", ", paramNames)} }}"
-            : "new object?[0]";
-
-        sb.AppendLine($"        using var context = _aspectRuntime.EnterMethod(typeof({contractTypeName}), \"{methodName}\", {paramArray});");
-        sb.AppendLine("        try");
-        sb.AppendLine("        {");
+        // Start operation tracking using StartOperation
+        var operationName = $"{contractTypeName}.{methodName}";
+        sb.AppendLine($"        using var op = _aspectRuntime.StartOperation(\"{operationName}\");");
 
         if (isAsync)
         {
@@ -208,19 +202,17 @@ public class PintoBeanCodeGen : IIncrementalGenerator
             if (method.ReturnType.Name == "Task" && method.ReturnType is INamedTypeSymbol taskType && !taskType.IsGenericType)
             {
                 // Task (no return value)
-                sb.AppendLine($"            await _resilienceExecutor.ExecuteAsync(async ct => ");
-                sb.AppendLine($"                await _registry.For<{contractTypeName}>().InvokeAsync(async (service, ct) => ");
-                sb.AppendLine($"                    await service.{methodName}({argumentList}), ct), CancellationToken.None);");
-                sb.AppendLine("            _aspectRuntime.ExitMethod(context, null);");
+                sb.AppendLine($"        await _resilienceExecutor.ExecuteAsync(async ct => ");
+                sb.AppendLine($"            await _registry.For<{contractTypeName}>().InvokeAsync(async (service, ct) => ");
+                sb.AppendLine($"                await service.{methodName}({argumentList}), ct), CancellationToken.None);");
             }
             else
             {
                 // Task<T>
-                sb.AppendLine($"            var result = await _resilienceExecutor.ExecuteAsync(async ct => ");
-                sb.AppendLine($"                await _registry.For<{contractTypeName}>().InvokeAsync(async (service, ct) => ");
-                sb.AppendLine($"                    await service.{methodName}({argumentList}), ct), CancellationToken.None);");
-                sb.AppendLine("            _aspectRuntime.ExitMethod(context, result);");
-                sb.AppendLine("            return result;");
+                sb.AppendLine($"        var result = await _resilienceExecutor.ExecuteAsync(async ct => ");
+                sb.AppendLine($"            await _registry.For<{contractTypeName}>().InvokeAsync(async (service, ct) => ");
+                sb.AppendLine($"                await service.{methodName}({argumentList}), ct), CancellationToken.None);");
+                sb.AppendLine("        return result;");
             }
         }
         else
@@ -229,33 +221,24 @@ public class PintoBeanCodeGen : IIncrementalGenerator
             if (method.ReturnType.SpecialType == SpecialType.System_Void)
             {
                 // void method
-                sb.AppendLine($"            _resilienceExecutor.Execute(() => ");
+                sb.AppendLine($"        _resilienceExecutor.Execute(() => ");
+                sb.AppendLine($"        {{");
+                sb.AppendLine($"            _registry.For<{contractTypeName}>().Invoke(service => ");
                 sb.AppendLine($"            {{");
-                sb.AppendLine($"                _registry.For<{contractTypeName}>().Invoke(service => ");
-                sb.AppendLine($"                {{");
-                sb.AppendLine($"                    service.{methodName}({argumentList});");
-                sb.AppendLine($"                    return (object?)null;");
-                sb.AppendLine($"                }});");
+                sb.AppendLine($"                service.{methodName}({argumentList});");
                 sb.AppendLine($"                return (object?)null;");
                 sb.AppendLine($"            }});");
-                sb.AppendLine("            _aspectRuntime.ExitMethod(context, null);");
+                sb.AppendLine($"            return (object?)null;");
+                sb.AppendLine($"        }});");
             }
             else
             {
                 // method with return value
-                sb.AppendLine($"            var result = _resilienceExecutor.Execute(() => ");
-                sb.AppendLine($"                _registry.For<{contractTypeName}>().Invoke(service => service.{methodName}({argumentList})));");
-                sb.AppendLine("            _aspectRuntime.ExitMethod(context, result);");
-                sb.AppendLine("            return result;");
+                sb.AppendLine($"        var result = _resilienceExecutor.Execute(() => ");
+                sb.AppendLine($"            _registry.For<{contractTypeName}>().Invoke(service => service.{methodName}({argumentList})));");
+                sb.AppendLine("        return result;");
             }
         }
-
-        sb.AppendLine("        }");
-        sb.AppendLine("        catch (Exception ex)");
-        sb.AppendLine("        {");
-        sb.AppendLine("            _aspectRuntime.RecordException(context, ex);");
-        sb.AppendLine("            throw;");
-        sb.AppendLine("        }");
         sb.AppendLine("    }");
     }
 
