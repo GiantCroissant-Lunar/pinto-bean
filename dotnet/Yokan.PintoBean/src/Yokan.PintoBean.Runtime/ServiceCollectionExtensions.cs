@@ -337,4 +337,69 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Adds the Polly-based resilience executor to the service collection with default configuration.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection AddPollyResilience(this IServiceCollection services)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        // Register options with defaults
+        services.AddOptions<PollyResilienceExecutorOptions>();
+
+        // Register the Polly-based resilience executor
+        services.TryAddSingleton<IResilienceExecutor, PollyResilienceExecutor>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the Polly-based resilience executor to the service collection with custom configuration.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="configure">A delegate to configure the Polly resilience executor options.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> or <paramref name="configure"/> is null.</exception>
+    public static IServiceCollection AddPollyResilience(this IServiceCollection services, Action<PollyResilienceExecutorOptions> configure)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (configure == null) throw new ArgumentNullException(nameof(configure));
+
+        // Register and configure options
+        services.AddOptions<PollyResilienceExecutorOptions>()
+            .Configure(configure);
+
+        // Register the Polly-based resilience executor
+        services.TryAddSingleton<IResilienceExecutor, PollyResilienceExecutor>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the Polly-based resilience executor to the service collection with configuration binding.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="configuration">The configuration section to bind to PollyResilienceExecutorOptions.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> or <paramref name="configuration"/> is null.</exception>
+    [UnconditionalSuppressMessage("AOT", "IL3050:Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.", Justification = "Configuration binding is expected to work with PollyResilienceExecutorOptions properties.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code.", Justification = "Configuration binding is expected to work with PollyResilienceExecutorOptions properties.")]
+    public static IServiceCollection AddPollyResilience(this IServiceCollection services, IConfiguration configuration)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+
+        // Register and bind options to configuration
+        services.AddOptions<PollyResilienceExecutorOptions>()
+            .Bind(configuration);
+
+        // Register the Polly-based resilience executor
+        services.TryAddSingleton<IResilienceExecutor, PollyResilienceExecutor>();
+
+        return services;
+    }
 }

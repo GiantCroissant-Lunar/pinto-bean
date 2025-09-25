@@ -19,6 +19,10 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
 
+    <!-- Resilience packages -->
+    <PackageVersion Include="Polly" Version="7.2.4" />
+    <PackageVersion Include="Polly.Extensions.Http" Version="3.0.0" />
+
     <!-- Testing packages -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageVersion Include="xunit" Version="2.4.2" />
