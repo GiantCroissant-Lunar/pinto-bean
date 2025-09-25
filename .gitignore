@@ -21,6 +21,7 @@ dist/
 
 # Build and cache directories
 .cache/
+.dotnet-tools/
 
 # BenchmarkDotNet artifacts
 **/BenchmarkDotNet.Artifacts/
