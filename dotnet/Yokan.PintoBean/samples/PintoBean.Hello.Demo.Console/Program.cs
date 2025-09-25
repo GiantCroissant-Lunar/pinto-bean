@@ -21,15 +21,16 @@ Console.WriteLine($"Providers.Stub Version: {PintoBeanProvidersStub.Version}");
 Console.WriteLine();
 
 Console.WriteLine("Choose demonstration mode:");
-Console.WriteLine("1. NoOp AspectRuntime (no telemetry)");
-Console.WriteLine("2. OpenTelemetry AspectRuntime (with tracing and metrics)");
-Console.Write("Enter choice (1 or 2, or press Enter for OpenTelemetry): ");
+Console.WriteLine("1. NoOp AspectRuntime + PassThrough ResilienceExecutor (baseline)");
+Console.WriteLine("2. OpenTelemetry AspectRuntime + Polly ResilienceExecutor (with tracing and resilience)");
+Console.Write("Enter choice (1 or 2, or press Enter for OpenTelemetry + Polly): ");
 
 var choice = Console.ReadLine();
 var useOpenTelemetry = string.IsNullOrWhiteSpace(choice) || choice != "1";
+var usePollyResilience = useOpenTelemetry; // Same choice controls both
 
 Console.WriteLine();
-Console.WriteLine($"🔧 Setting up Dependency Injection with {(useOpenTelemetry ? "OpenTelemetry" : "NoOp")} AspectRuntime...");
+Console.WriteLine($"🔧 Setting up Dependency Injection with {(useOpenTelemetry ? "OpenTelemetry AspectRuntime" : "NoOp AspectRuntime")} and {(usePollyResilience ? "Polly ResilienceExecutor" : "PassThrough ResilienceExecutor")}...");
 
 var services = new ServiceCollection();
 
@@ -53,6 +54,23 @@ else
     services.AddNoOpAspectRuntime();
 }
 
+// Configure resilience executor
+if (usePollyResilience)
+{
+    services.AddPollyResilience(options =>
+    {
+        options.DefaultTimeoutSeconds = 5.0; // 5 second timeout for demo
+        options.MaxRetryAttempts = 3;
+        options.BaseRetryDelayMilliseconds = 500.0; // Start with 500ms delays
+        options.EnableCircuitBreaker = false; // Keep it simple for demo
+    });
+}
+else
+{
+    // Register default pass-through resilience executor
+    services.AddResilienceExecutor();
+}
+
 // Register required services
 services.AddServiceRegistry(registry =>
 {
@@ -62,7 +80,7 @@ services.AddServiceRegistry(registry =>
     var primaryProvider = new DemoHelloService("PrimaryGreetingService");
     var primaryCapabilities = ProviderCapabilities.Create("primary-hello")
         .WithPriority(Priority.High)
-        .WithPlatform(Platform.DotNet)
+        .WithPlatform(Platform.Any)
         .WithTags("primary", "greeting", "production");
 
     registry.Register<IHelloService>(primaryProvider, primaryCapabilities);
@@ -72,7 +90,7 @@ services.AddServiceRegistry(registry =>
     var fallbackProvider = new DemoHelloService("FallbackGreetingService");
     var fallbackCapabilities = ProviderCapabilities.Create("fallback-hello")
         .WithPriority(Priority.Normal)
-        .WithPlatform(Platform.DotNet)
+        .WithPlatform(Platform.Any)
         .WithTags("fallback", "greeting", "backup");
 
     registry.Register<IHelloService>(fallbackProvider, fallbackCapabilities);
@@ -81,7 +99,6 @@ services.AddServiceRegistry(registry =>
 
 // Add required runtime services
 services.AddSelectionStrategies();
-services.AddResilienceExecutor();
 
 var serviceProvider = services.BuildServiceProvider();
 
@@ -92,8 +109,10 @@ Console.WriteLine();
 // Get the service registry and aspect runtime from DI
 var registry = serviceProvider.GetRequiredService<IServiceRegistry>();
 var aspectRuntime = serviceProvider.GetRequiredService<IAspectRuntime>();
+var resilienceExecutor = serviceProvider.GetRequiredService<IResilienceExecutor>();
 
 Console.WriteLine($"AspectRuntime Type: {aspectRuntime.GetType().Name}");
+Console.WriteLine($"ResilienceExecutor Type: {resilienceExecutor.GetType().Name}");
 Console.WriteLine();
 
 // Subscribe to provider changes
@@ -154,7 +173,7 @@ using (var operation = aspectRuntime.StartOperation("demo-workflow", new Diction
     var runtimeProvider = new DemoHelloService("RuntimeGreetingService");
     var runtimeCapabilities = ProviderCapabilities.Create("runtime-hello")
         .WithPriority(Priority.Critical)
-        .WithPlatform(Platform.DotNet)
+        .WithPlatform(Platform.Any)
         .WithTags("runtime", "dynamic", "critical")
         .AddMetadata("version", "1.0.0")
         .AddMetadata("registered-at", DateTime.UtcNow);
@@ -186,6 +205,83 @@ using (var operation = aspectRuntime.StartOperation("demo-workflow", new Diction
 }
 
 Console.WriteLine();
+Console.WriteLine("🛡️  Testing Resilience Patterns:");
+Console.WriteLine($"   ResilienceExecutor: {resilienceExecutor.GetType().Name}");
+
+// Get typed registry for resilience testing
+var resilienceTypedRegistry = registry.For<IHelloService>();
+var resilienceRequest = new HelloRequest
+{
+    Name = "World",
+    Language = "en",
+    Context = "resilience-demo"
+};
+
+if (usePollyResilience)
+{
+    Console.WriteLine("   Demonstrating timeout and retry with Polly policies...");
+    
+    // Add a provider that can simulate failures
+    var unreliableProvider = new UnreliableHelloService("UnreliableService");
+    var unreliableCapabilities = ProviderCapabilities.Create("unreliable-hello")
+        .WithPriority(Priority.Critical)
+        .WithPlatform(Platform.Any)
+        .WithTags("demo", "unreliable");
+    
+    var unreliableRegistration = registry.Register<IHelloService>(unreliableProvider, unreliableCapabilities);
+    
+    Console.WriteLine("   ➕ Registered unreliable service provider");
+    
+    try 
+    {
+        // First call should succeed (reset failure count)
+        unreliableProvider.ResetFailures();
+        var successResponse = await resilienceTypedRegistry.InvokeAsync((service, ct) => 
+            resilienceExecutor.ExecuteAsync(async (innerCt) => 
+                await service.SayHelloAsync(resilienceRequest, innerCt), ct));
+        
+        Console.WriteLine($"   ✅ Success on attempt: {successResponse.Message}");
+        
+        // Second call should trigger retries
+        unreliableProvider.SetFailureMode(2); // Fail first 2 attempts, succeed on 3rd
+        Console.WriteLine("   ⚠️  Simulating transient failures (will retry)...");
+        
+        var start = DateTime.UtcNow;
+        var retryResponse = await resilienceTypedRegistry.InvokeAsync((service, ct) => 
+            resilienceExecutor.ExecuteAsync(async (innerCt) => 
+                await service.SayHelloAsync(resilienceRequest, innerCt), ct));
+        var elapsed = DateTime.UtcNow - start;
+        
+        Console.WriteLine($"   ✅ Success after retries: {retryResponse.Message}");
+        Console.WriteLine($"   ⏱️  Total time with retries: {elapsed.TotalMilliseconds:F0}ms");
+        Console.WriteLine($"   📊 Call attempts: {unreliableProvider.CallAttempts}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"   ❌ Failed after all retries: {ex.GetType().Name}: {ex.Message}");
+    }
+    finally
+    {
+        registry.Unregister(unreliableRegistration);
+        Console.WriteLine("   ➖ Removed unreliable service provider");
+    }
+}
+else
+{
+    Console.WriteLine("   Using PassThrough executor - no resilience patterns applied");
+    
+    // Show direct execution timing for comparison
+    var start = DateTime.UtcNow;
+    var directResponse = await resilienceTypedRegistry.InvokeAsync((service, ct) => 
+        resilienceExecutor.ExecuteAsync(async (innerCt) => 
+            await service.SayHelloAsync(resilienceRequest, innerCt), ct));
+    var elapsed = DateTime.UtcNow - start;
+    
+    Console.WriteLine($"   ✅ Direct execution: {directResponse.Message}");
+    Console.WriteLine($"   ⏱️  Execution time: {elapsed.TotalMilliseconds:F0}ms");
+}
+
+Console.WriteLine();
 Console.WriteLine("📊 Final Registry State:");
 var finalRegistrations = registry.GetRegistrations<IHelloService>();
 Console.WriteLine($"Active Providers: {finalRegistrations.Count()}");
@@ -202,13 +298,21 @@ Console.WriteLine("   - ✅ Priority-based provider selection");
 Console.WriteLine("   - ✅ Typed For<IHelloService>() resolution");
 Console.WriteLine("   - ✅ ProviderChanged events for cache invalidation");
 Console.WriteLine("   - ✅ Dependency injection integration");
-Console.WriteLine($"   - ✅ {(useOpenTelemetry ? "OpenTelemetry" : "NoOp")} AspectRuntime telemetry");
+Console.WriteLine($"   - ✅ {(useOpenTelemetry ? "OpenTelemetry AspectRuntime" : "NoOp AspectRuntime")} telemetry");
+Console.WriteLine($"   - ✅ {(usePollyResilience ? "Polly ResilienceExecutor with retry/timeout" : "PassThrough ResilienceExecutor")} patterns");
 
 if (useOpenTelemetry)
 {
     Console.WriteLine();
     Console.WriteLine("📈 OpenTelemetry telemetry data should appear above!");
     Console.WriteLine("    Look for Activity traces and Histogram metrics.");
+}
+
+if (usePollyResilience)
+{
+    Console.WriteLine();
+    Console.WriteLine("🛡️  Polly resilience patterns demonstrated!");
+    Console.WriteLine("    Look for retry attempts and timing information above.");
 }
 
 // Properly dispose of the service provider to clean up OpenTelemetry resources
@@ -242,5 +346,72 @@ public class DemoHelloService : IHelloService
             ServiceInfo = Name,
             Language = request.Language ?? "en"
         });
+    }
+}
+
+// Unreliable demo service for demonstrating resilience patterns
+public class UnreliableHelloService : IHelloService
+{
+    public string Name { get; }
+    public int CallAttempts { get; private set; }
+    private int _failuresRemaining;
+
+    public UnreliableHelloService(string name)
+    {
+        Name = name;
+    }
+
+    public void ResetFailures()
+    {
+        CallAttempts = 0;
+        _failuresRemaining = 0;
+    }
+
+    public void SetFailureMode(int failuresToSimulate)
+    {
+        CallAttempts = 0;
+        _failuresRemaining = failuresToSimulate;
+    }
+
+    public async Task<HelloResponse> SayHelloAsync(HelloRequest request, CancellationToken cancellationToken = default)
+    {
+        CallAttempts++;
+        
+        if (_failuresRemaining > 0)
+        {
+            _failuresRemaining--;
+            Console.WriteLine($"      🔄 Attempt {CallAttempts}: Simulated failure (remaining: {_failuresRemaining})");
+            await Task.Delay(50, cancellationToken); // Small delay to show retry timing
+            throw new InvalidOperationException($"Simulated transient failure from {Name}");
+        }
+
+        Console.WriteLine($"      ✅ Attempt {CallAttempts}: Success!");
+        return new HelloResponse
+        {
+            Message = $"Hello, {request.Name}! Greetings from {Name} (after {CallAttempts} attempts).",
+            ServiceInfo = Name,
+            Language = request.Language ?? "en"
+        };
+    }
+
+    public async Task<HelloResponse> SayGoodbyeAsync(HelloRequest request, CancellationToken cancellationToken = default)
+    {
+        CallAttempts++;
+        
+        if (_failuresRemaining > 0)
+        {
+            _failuresRemaining--;
+            Console.WriteLine($"      🔄 Attempt {CallAttempts}: Simulated failure (remaining: {_failuresRemaining})");
+            await Task.Delay(50, cancellationToken);
+            throw new InvalidOperationException($"Simulated transient failure from {Name}");
+        }
+
+        Console.WriteLine($"      ✅ Attempt {CallAttempts}: Success!");
+        return new HelloResponse
+        {
+            Message = $"Farewell, {request.Name}! Until next time, from {Name} (after {CallAttempts} attempts).",
+            ServiceInfo = Name,
+            Language = request.Language ?? "en"
+        };
     }
 }
