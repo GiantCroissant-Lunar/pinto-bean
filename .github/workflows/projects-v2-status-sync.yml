@@ -122,10 +122,10 @@ jobs:
                     contentId: issueData.id
                   });
 
-                  console.log(`✅ Added issue to project: ${addResponse.item.project.title}`);
+                  console.log(`✅ Added issue to project: ${addResponse.addProjectV2ItemById.item.project.title}`);
 
                   // Update issueData to include the new project item
-                  issueData.projectItems.nodes.push(addResponse.item);
+                  issueData.projectItems.nodes.push(addResponse.addProjectV2ItemById.item);
                 } else {
                   console.log(`ℹ️ Issue not in projects and action is ${action}, skipping`);
                   return;
@@ -236,40 +236,13 @@ jobs:
                 });
 
                 console.log(`✅ Updated project ${project.title}: Status set to "${statusOption.name}"`);
-
-                // Add progress comment to issue
-                const comment = `🤖 **Project Status Update**\n\n` +
-                  `📊 **Project**: ${project.title}\n` +
-                  `🔄 **Status**: ${statusOption.name}\n` +
-                  `⚡ **Trigger**: Issue ${action}\n\n` +
-                  `_Automated by Project v2 Status Sync workflow._`;
-
-                await github.rest.issues.createComment({
-                  owner,
-                  repo,
-                  issue_number: issue.number,
-                  body: comment
-                });
-
-                console.log(`💬 Added status update comment to issue #${issue.number}`);
+                console.log(`📊 Project: ${project.title} | Status: ${statusOption.name} | Trigger: Issue ${action}`);
               }
 
             } catch (error) {
               console.error(`❌ Error updating issue #${issue.number}:`, error);
-
-              // Add error comment
-              const errorComment = `❌ **Project Status Update Failed**\n\n` +
-                `**Error**: ${error.message}\n` +
-                `**Issue**: #${issue.number}\n` +
-                `**Action**: ${action}\n\n` +
-                `_Please check the [workflow logs](https://github.com/${owner}/${repo}/actions) for details._`;
-
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: issue.number,
-                body: errorComment
-              });
+              console.error(`❌ Error details: ${error.message}`);
+              // Note: Cannot add comment due to permission restrictions
             }
 
             console.log('🎯 Project Status Sync Complete!');
