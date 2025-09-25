@@ -152,6 +152,12 @@ public sealed class PluginHost : IPluginHost
 
         try
         {
+            // If the plugin instance implements IQuiesceable, call QuiesceAsync first
+            if (handle.Instance is IQuiesceable quiesceable)
+            {
+                await quiesceable.QuiesceAsync();
+            }
+
             await Task.Run(() =>
             {
                 handle.State = PluginState.Deactivated;
@@ -184,6 +190,12 @@ public sealed class PluginHost : IPluginHost
 
         try
         {
+            // If the plugin is active and implements IQuiesceable, call QuiesceAsync first
+            if (handle.State == PluginState.Active && handle.Instance is IQuiesceable quiesceable)
+            {
+                await quiesceable.QuiesceAsync();
+            }
+
             await Task.Run(() =>
             {
                 handle.State = PluginState.Unloaded;
