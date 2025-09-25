@@ -286,4 +286,55 @@ public static class ServiceCollectionExtensions
         return services.AddSelectionStrategies(options =>
             options.SetCategoryDefault(category, SelectionStrategyType.Sharded));
     }
+
+    /// <summary>
+    /// Adds the resilience executor to the service collection with the default pass-through implementation.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    public static IServiceCollection AddResilienceExecutor(this IServiceCollection services)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        // Register the default pass-through implementation
+        services.TryAddSingleton<IResilienceExecutor>(NoOpResilienceExecutor.Instance);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the resilience executor to the service collection with a custom implementation.
+    /// </summary>
+    /// <typeparam name="TImplementation">The resilience executor implementation type.</typeparam>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
+    [UnconditionalSuppressMessage("Trimming", "IL2091:Target generic argument does not satisfy 'DynamicallyAccessedMemberTypes' requirements", Justification = "TImplementation is expected to have a public constructor.")]
+    public static IServiceCollection AddResilienceExecutor<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(this IServiceCollection services)
+        where TImplementation : class, IResilienceExecutor
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        services.TryAddSingleton<IResilienceExecutor, TImplementation>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the resilience executor to the service collection with a factory.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="factory">The factory to create the resilience executor.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> or <paramref name="factory"/> is null.</exception>
+    public static IServiceCollection AddResilienceExecutor(this IServiceCollection services, Func<IServiceProvider, IResilienceExecutor> factory)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (factory == null) throw new ArgumentNullException(nameof(factory));
+
+        services.TryAddSingleton(factory);
+
+        return services;
+    }
 }

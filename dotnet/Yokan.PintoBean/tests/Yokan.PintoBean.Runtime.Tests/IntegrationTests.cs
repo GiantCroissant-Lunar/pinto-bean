@@ -354,6 +354,32 @@ public class IntegrationTests
         Assert.True(totalCalls > 0, "At least one provider should be called through the façade");
     }
 
+    [Fact]
+    public void End2End_ResilienceExecutor_Integration_ShouldInjectCorrectExecutor()
+    {
+        // Arrange
+        var services = new ServiceCollection()
+            .AddServiceRegistry()
+            .AddSelectionStrategies()
+            .AddResilienceExecutor(); // This should register the NoOpResilienceExecutor
+
+        var serviceProvider = services.BuildServiceProvider();
+        
+        // Act - Simulate what the generated facade would do
+        var registry = serviceProvider.GetRequiredService<IServiceRegistry>();
+        var resilienceExecutor = serviceProvider.GetService<IResilienceExecutor>();
+        var aspectRuntime = NoOpAspectRuntime.Instance;
+        
+        var facade = new HelloServiceFacade(registry, resilienceExecutor, aspectRuntime);
+        
+        // Assert
+        Assert.NotNull(resilienceExecutor);
+        Assert.IsType<Yokan.PintoBean.Runtime.NoOpResilienceExecutor>(resilienceExecutor);
+        
+        // Verify the facade was constructed correctly with the DI-provided executor
+        Assert.NotNull(facade);
+    }
+
     // Test service interfaces for category inference
     public interface IAnalyticsService { void Track(string eventName); }
     public interface IResourceService { string LoadResource(string key); }
