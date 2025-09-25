@@ -1,11 +1,11 @@
 using ConsoleGame.Contracts;
 using Microsoft.Win32.SafeHandles;
-using ReactiveUI;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Reactive.Disposables;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -478,19 +478,30 @@ internal sealed class VlcAudioService : IAudioService
     }
 }
 
-public sealed class DungeonViewModel : ReactiveObject
+public sealed class DungeonViewModel : INotifyPropertyChanged
 {
     private (int X, int Y) _player = (1, 1);
     public (int X, int Y) Player
     {
         get => _player;
-        set => this.RaiseAndSetIfChanged(ref _player, value);
+        set
+        {
+            if (_player == value)
+            {
+                return;
+            }
+
+            _player = value;
+            OnPropertyChanged();
+        }
     }
 
     public int Width { get; }
     public int Height { get; }
 
     public ObservableCollection<(int X, int Y, char Glyph)> Entities { get; } = new();
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public DungeonViewModel(int width = 20, int height = 10)
     {
@@ -505,6 +516,9 @@ public sealed class DungeonViewModel : ReactiveObject
         var ny = Math.Clamp(Player.Y + dy, 0, Height - 1);
         Player = (nx, ny);
     }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
 
 public interface IAppLoop { Task RunAsync(CancellationToken ct); }
@@ -977,16 +991,13 @@ internal sealed class NativeStderrCapture : IDisposable
             try { _pipeWriter?.Dispose(); } catch { }
             try { _pipeWrite?.Dispose(); } catch { }
 
-            if (_readerThread is not null)
-            {
-                if (!_readerThread.Join(TimeSpan.FromSeconds(1)))
-                {
-                    try { _readerThread.Join(TimeSpan.FromSeconds(2)); } catch { }
-                }
-            }
-
             try { _readerStream?.Dispose(); } catch { }
             try { _pipeRead?.Dispose(); } catch { }
+
+            if (_readerThread is not null)
+            {
+                try { _readerThread.Join(TimeSpan.FromSeconds(5)); } catch { }
+            }
 
             SetStdHandle(STD_ERROR_HANDLE, _originalHandle);
             var restored = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
@@ -1038,7 +1049,16 @@ internal sealed class CompositionRoot : IDisposable
         ViewModel = new DungeonViewModel();
         LogService = new LogBuffer();
         _audio = CreateAudioService();
-        Loop = new AppLoop(ViewModel, _audio, LogService);
+        var bareLoopEnv = Environment.GetEnvironmentVariable("CONSOLEGAME_DEBUG_BARE_LOOP");
+        if (!string.IsNullOrWhiteSpace(bareLoopEnv) && (string.Equals(bareLoopEnv, "1", StringComparison.OrdinalIgnoreCase) || string.Equals(bareLoopEnv, "true", StringComparison.OrdinalIgnoreCase)))
+        {
+            LogService.Info("Using bare app loop (CONSOLEGAME_DEBUG_BARE_LOOP).");
+            Loop = new BareAppLoop(LogService);
+        }
+        else
+        {
+            Loop = new AppLoop(ViewModel, _audio, LogService);
+        }
     }
 
     public void Dispose()
@@ -1061,6 +1081,33 @@ internal sealed class CompositionRoot : IDisposable
     }
 }
 
+internal sealed class BareAppLoop : IAppLoop
+{
+    private readonly ILogService _log;
+
+    public BareAppLoop(ILogService log)
+    {
+        _log = log;
+    }
+
+    public async Task RunAsync(CancellationToken ct)
+    {
+        _log.Info("Bare loop active.");
+        try
+        {
+            await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _log.Info("Bare loop cancelled.");
+        }
+        finally
+        {
+            _log.Info("Bare loop exiting.");
+        }
+    }
+}
+
 [Plugin("consolegame.dungeon", "Dungeon", "0.1.0", Description = "Dungeon TUI with reactive state and audio effects")]
 public sealed class DungeonPlugin : IPlugin, IRuntimePlugin, IDisposable
 {
@@ -1071,13 +1118,16 @@ public sealed class DungeonPlugin : IPlugin, IRuntimePlugin, IDisposable
     private CompositionRoot? _root;
     private string? _pluginDirectory;
 
+    private CompositionRoot EnsureRoot(IServiceProvider? services)
+        => _root ??= DungeonComposition.Resolve<CompositionRoot>(services);
+
     public Task ConfigureAsync(CancellationToken cancellationToken = default)
     {
-        _root ??= new CompositionRoot();
+        var root = EnsureRoot(Context?.Services);
         if (Context?.PluginDirectory is { Length: > 0 } pluginDir)
         {
             _pluginDirectory = pluginDir;
-            var logService = _root.LogService;
+            var logService = root.LogService;
             logService.SetBaseDirectory(pluginDir);
             logService.Info($"Log directory set to {pluginDir}");
         }
@@ -1086,14 +1136,15 @@ public sealed class DungeonPlugin : IPlugin, IRuntimePlugin, IDisposable
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        _root ??= new CompositionRoot();
+        var root = EnsureRoot(Context?.Services);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, Context?.ShutdownToken ?? default);
-    var logService = _root.LogService;
+        var logService = root.LogService;
         NativeStderrCapture? stderrCapture = null;
 
         try
         {
-            if (OperatingSystem.IsWindows())
+            var captureEnabled = !string.Equals(Environment.GetEnvironmentVariable("CONSOLEGAME_DISABLE_NATIVE_CAPTURE"), "1", StringComparison.OrdinalIgnoreCase);
+            if (OperatingSystem.IsWindows() && captureEnabled)
             {
                 var baseDir = ResolvePluginDirectory();
                 if (!string.IsNullOrWhiteSpace(baseDir))
@@ -1112,7 +1163,7 @@ public sealed class DungeonPlugin : IPlugin, IRuntimePlugin, IDisposable
                 }
             }
 
-            await _root.Loop.RunAsync(linkedCts.Token);
+            await root.Loop.RunAsync(linkedCts.Token);
         }
         finally
         {
@@ -1121,12 +1172,17 @@ public sealed class DungeonPlugin : IPlugin, IRuntimePlugin, IDisposable
             {
                 logService?.Info($"Native stderr log file: {stderrCapture.LogPath}");
             }
+            DungeonComposition.Reset();
+            _root = null;
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
         }
     }
 
     public void Dispose()
     {
-        _root?.Dispose();
+        DungeonComposition.Reset();
         _root = null;
     }
 
