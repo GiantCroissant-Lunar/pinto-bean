@@ -70,6 +70,16 @@ public sealed class PluginHandle
     /// </summary>
     public Exception? LastError { get; internal set; }
 
+    /// <summary>
+    /// Gets the timestamp when the plugin was quiesced for soft-swap, if applicable.
+    /// </summary>
+    public DateTimeOffset? QuiescedAt { get; internal set; }
+
+    /// <summary>
+    /// Gets the grace period in seconds for quiescing, if applicable.
+    /// </summary>
+    public int? GracePeriodSeconds { get; internal set; }
+
     /// <inheritdoc />
     public override string ToString() => $"{Id} ({State})";
 
@@ -100,6 +110,11 @@ public enum PluginState
     /// The plugin has been deactivated but is still loaded.
     /// </summary>
     Deactivated,
+
+    /// <summary>
+    /// The plugin is being quiesced for soft-swap (Unity path).
+    /// </summary>
+    Quiescing,
 
     /// <summary>
     /// The plugin has been unloaded from memory.
