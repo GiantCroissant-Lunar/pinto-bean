@@ -281,7 +281,7 @@ class GitHubProjectUpdater:
                 project_items = issue["projectItems"]["nodes"]
 
             if not project_items:
-                print("ℹ️ Issue is not in any projects, skipping status update")
+                print("i Issue is not in any projects, skipping status update")
                 return
 
             # Update status in each project
@@ -333,7 +333,7 @@ class GitHubProjectUpdater:
         target_status = self.determine_target_status("issues", action)
 
         if not target_status:
-            print("ℹ️ No status change needed")
+            print("i No status change needed")
             return
 
         # Only add to project for opened events
@@ -356,7 +356,7 @@ class GitHubProjectUpdater:
         linked_issues = self.find_linked_issues(pr_body, pr_title)
 
         if not linked_issues:
-            print("ℹ️ No linked issues found")
+            print("i No linked issues found")
             return
 
         print(f"🔗 Linked issues: {', '.join(map(str, linked_issues))}")
@@ -366,7 +366,7 @@ class GitHubProjectUpdater:
         )
 
         if not target_status:
-            print("ℹ️ No status change needed")
+            print("i No status change needed")
             return
 
         # Update each linked issue
