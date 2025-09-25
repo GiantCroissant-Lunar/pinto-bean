@@ -2,11 +2,14 @@ name: Project v2 Status Sync
 
 on:
   issues:
-    types: [opened, closed, reopened]
+    types: [opened, closed, reopened, assigned, unassigned]
+  pull_request:
+    types: [opened, closed, ready_for_review, converted_to_draft]
 
 permissions:
   contents: read
   issues: write
+  pull-requests: read
 
 jobs:
   sync-project-status:
@@ -18,25 +21,125 @@ jobs:
           github-token: ${{ secrets.USE_PROJECT_V2_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const issue = context.payload.issue;
+            const eventName = context.eventName;
             const action = context.payload.action;
 
-            console.log(`🔍 Processing issue #${issue.number}: ${issue.title}`);
-            console.log(`📝 Action: ${action}`);
+            let issueNumber, issueId, issueTitle;
+            let targetStatus = null;
 
-            // Determine target status based on action
-            let targetStatus;
-            if (action === 'opened') {
-              targetStatus = 'Backlog';
-              console.log(`🆕 Issue opened → Moving to "Backlog"`);
-            } else if (action === 'closed') {
-              targetStatus = 'Done';
-              console.log(`✅ Issue closed → Moving to "Done"`);
-            } else if (action === 'reopened') {
-              targetStatus = 'Backlog';
-              console.log(`🔄 Issue reopened → Moving to "Backlog"`);
-            } else {
+            if (eventName === 'issues') {
+              const issue = context.payload.issue;
+              issueNumber = issue.number;
+              issueId = issue.id;
+              issueTitle = issue.title;
+
+              console.log(`🔍 Processing issue #${issueNumber}: ${issueTitle}`);
+              console.log(`📝 Issue action: ${action}`);
+
+              if (action === 'opened') {
+                targetStatus = 'Backlog';
+                console.log(`🆕 Issue opened → Moving to "Backlog"`);
+              } else if (action === 'assigned') {
+                targetStatus = 'Ready';
+                console.log(`👤 Issue assigned → Moving to "Ready"`);
+              } else if (action === 'unassigned') {
+                // Check if issue still has assignees
+                if (issue.assignees && issue.assignees.length === 0) {
+                  targetStatus = 'Backlog';
+                  console.log(`👤 Issue unassigned (no assignees left) → Moving to "Backlog"`);
+                } else {
+                  console.log(`👤 Issue unassigned but still has assignees → No status change`);
+                  return;
+                }
+              } else if (action === 'closed') {
+                targetStatus = 'Done';
+                console.log(`✅ Issue closed → Moving to "Done"`);
+              } else if (action === 'reopened') {
+                targetStatus = 'Backlog';
+                console.log(`🔄 Issue reopened → Moving to "Backlog"`);
+              }
+            } else if (eventName === 'pull_request') {
+              const pullRequest = context.payload.pull_request;
+              issueNumber = await getLinkedIssueNumber(github, owner, repo, pullRequest);
+
+              if (!issueNumber) {
+                console.log('ℹ️ No linked issue found for this pull request');
+                return;
+              }
+
+              console.log(`🔍 Processing PR #${pullRequest.number} linked to issue #${issueNumber}`);
+              console.log(`📝 PR action: ${action}`);
+
+              if (action === 'opened' && !pullRequest.draft) {
+                targetStatus = 'In review';
+                console.log(`📋 PR opened (ready for review) → Moving to "In review"`);
+              } else if (action === 'opened' && pullRequest.draft) {
+                targetStatus = 'In progress';
+                console.log(`📋 PR opened (draft) → Moving to "In progress"`);
+              } else if (action === 'ready_for_review') {
+                targetStatus = 'In review';
+                console.log(`👀 PR ready for review → Moving to "In review"`);
+              } else if (action === 'converted_to_draft') {
+                targetStatus = 'In progress';
+                console.log(`📝 PR converted to draft → Moving to "In progress"`);
+              } else if (action === 'closed' && pullRequest.merged) {
+                targetStatus = 'Done';
+                console.log(`✅ PR merged → Moving to "Done"`);
+              }
+            }
+
+            if (!targetStatus) {
               console.log('ℹ️ No status change needed for this action');
+              return;
+            }
+
+            // Helper function to find linked issue from PR
+            async function getLinkedIssueNumber(github, owner, repo, pullRequest) {
+              // Check PR body for issue references like "fixes #123", "closes #456"
+              const body = pullRequest.body || '';
+              const issueMatches = body.match(/(?:fix(?:es)?|close(?:s)?|resolve(?:s)?)\s+#(\d+)/gi);
+
+              if (issueMatches && issueMatches.length > 0) {
+                const match = issueMatches[0].match(/#(\d+)/);
+                if (match) {
+                  return parseInt(match[1]);
+                }
+              }
+
+              // Check for timeline events that link issues
+              try {
+                const timelineQuery = `
+                  query($owner: String!, $repo: String!, $number: Int!) {
+                    repository(owner: $owner, name: $repo) {
+                      pullRequest(number: $number) {
+                        closingIssuesReferences(first: 10) {
+                          nodes {
+                            number
+                          }
+                        }
+                      }
+                    }
+                  }
+                `;
+
+                const response = await github.graphql(timelineQuery, {
+                  owner,
+                  repo,
+                  number: pullRequest.number
+                });
+
+                if (response.repository.pullRequest.closingIssuesReferences.nodes.length > 0) {
+                  return response.repository.pullRequest.closingIssuesReferences.nodes[0].number;
+                }
+              } catch (error) {
+                console.log('Could not fetch closing issues references:', error.message);
+              }
+
+              return null;
+            }
+
+            if (!issueNumber) {
+              console.log('ℹ️ No issue number available');
               return;
             }
 
@@ -48,6 +151,9 @@ jobs:
                     issue(number: $number) {
                       id
                       title
+                      assignees(first: 10) {
+                        totalCount
+                      }
                       projectItems(first: 10) {
                         nodes {
                           id
@@ -66,16 +172,17 @@ jobs:
               const issueResponse = await github.graphql(issueQuery, {
                 owner,
                 repo,
-                number: issue.number
+                number: issueNumber
               });
 
               const issueData = issueResponse.repository.issue;
               console.log(`✅ Found issue: ${issueData.title}`);
+              console.log(`👥 Assignees count: ${issueData.assignees.totalCount}`);
 
               if (!issueData.projectItems.nodes.length) {
-                console.log(`📋 Issue #${issue.number} is not in any projects`);
+                console.log(`📋 Issue #${issueNumber} is not in any projects`);
 
-                if (action === 'opened') {
+                if (eventName === 'issues' && action === 'opened') {
                   console.log(`🔗 Adding issue to Project #3...`);
 
                   // Add to project first
@@ -185,6 +292,9 @@ jobs:
                 if (!statusOption) {
                   const statusMap = {
                     'Backlog': ['Todo', 'To Do', 'Open', 'New', 'Triage'],
+                    'Ready': ['Todo', 'To Do', 'Assigned', 'Ready to Start'],
+                    'In progress': ['In Progress', 'Working', 'Development', 'In Development'],
+                    'In review': ['In Review', 'Review', 'Code Review', 'Reviewing'],
                     'Done': ['Complete', 'Completed', 'Finished', 'Closed', 'Resolved']
                   };
 
@@ -236,11 +346,11 @@ jobs:
                 });
 
                 console.log(`✅ Updated project ${project.title}: Status set to "${statusOption.name}"`);
-                console.log(`📊 Project: ${project.title} | Status: ${statusOption.name} | Trigger: Issue ${action}`);
+                console.log(`📊 Project: ${project.title} | Status: ${statusOption.name} | Trigger: ${eventName} ${action}`);
               }
 
             } catch (error) {
-              console.error(`❌ Error updating issue #${issue.number}:`, error);
+              console.error(`❌ Error updating issue #${issueNumber}:`, error);
               console.error(`❌ Error details: ${error.message}`);
               // Note: Cannot add comment due to permission restrictions
             }
