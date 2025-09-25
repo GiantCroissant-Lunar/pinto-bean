@@ -182,9 +182,8 @@ jobs:
               if (!issueData.projectItems.nodes.length) {
                 console.log(`📋 Issue #${issueNumber} is not in any projects`);
 
-                // Add to project for any relevant event
-                if ((eventName === 'issues' && action === 'opened') ||
-                    (eventName === 'pull_request' && targetStatus)) {
+                // Only add to project for issue opened events, skip PR events
+                if (eventName === 'issues' && action === 'opened') {
                   console.log(`🔗 Adding issue to Project #3...`);
 
                   // Add to project first
@@ -236,7 +235,7 @@ jobs:
                   // Update issueData to include the new project item
                   issueData.projectItems.nodes.push(addResponse.addProjectV2ItemById.item);
                 } else {
-                  console.log(`ℹ️ Issue not in projects and action is ${action}, skipping`);
+                  console.log(`ℹ️ Issue not in projects, skipping (following ithome-ironman-2025 pattern)`);
                   return;
                 }
               }
@@ -273,7 +272,7 @@ jobs:
                 });
 
                 const statusField = fieldsResponse.node.fields.nodes.find(
-                  field => field.name && field.name.toLowerCase().includes('status')
+                  field => field.name === 'Status'
                 );
 
                 if (!statusField) {
