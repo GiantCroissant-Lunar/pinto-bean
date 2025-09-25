@@ -23,10 +23,10 @@ Console.WriteLine();
 Console.WriteLine("Choose demonstration mode:");
 Console.WriteLine("1. NoOp AspectRuntime (no telemetry)");
 Console.WriteLine("2. OpenTelemetry AspectRuntime (with tracing and metrics)");
-Console.Write("Enter choice (1 or 2): ");
+Console.Write("Enter choice (1 or 2, or press Enter for OpenTelemetry): ");
 
 var choice = Console.ReadLine();
-var useOpenTelemetry = choice == "2";
+var useOpenTelemetry = string.IsNullOrWhiteSpace(choice) || choice != "1";
 
 Console.WriteLine();
 Console.WriteLine($"🔧 Setting up Dependency Injection with {(useOpenTelemetry ? "OpenTelemetry" : "NoOp")} AspectRuntime...");
@@ -53,7 +53,7 @@ else
     services.AddNoOpAspectRuntime();
 }
 
-// Register the service registry with pre-configured providers
+// Register required services
 services.AddServiceRegistry(registry =>
 {
     Console.WriteLine("📝 Registering providers during DI setup:");
@@ -78,6 +78,10 @@ services.AddServiceRegistry(registry =>
     registry.Register<IHelloService>(fallbackProvider, fallbackCapabilities);
     Console.WriteLine($"  ✅ Registered: {fallbackCapabilities.ProviderId} (Priority: {fallbackCapabilities.Priority})");
 });
+
+// Add required runtime services
+services.AddSelectionStrategies();
+services.AddResilienceExecutor();
 
 var serviceProvider = services.BuildServiceProvider();
 
