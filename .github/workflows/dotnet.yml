@@ -18,3 +18,6 @@ jobs:
       - run: dotnet restore
       - run: dotnet build -c Release --nologo --no-restore
       - run: dotnet test -c Release --nologo --no-build
+      - name: Run Samples
+        run: pwsh ../../scripts/run-samples.ps1 -SkipBuild -ContinueOnFailure
+        continue-on-error: true
