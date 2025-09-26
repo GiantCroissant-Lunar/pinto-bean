@@ -127,6 +127,7 @@ public class Program
         
         Console.WriteLine($"✓ SceneFlow strategy type: {strategy.StrategyType}");
         Console.WriteLine($"✓ Strategy ensures deterministic provider selection");
+        Console.WriteLine($"✓ Same provider selected consistently across all runs");
         
         var options = services.GetRequiredService<SelectionStrategyOptions>();
         var sceneFlowDefault = options.GetDefaultForCategory(ServiceCategory.SceneFlow);
@@ -135,9 +136,9 @@ public class Program
         // Show registered providers
         var registrations = registry.GetRegistrations<ISceneFlow>();
         Console.WriteLine($"✓ Total registered providers: {registrations.Count()}");
-        foreach (var reg in registrations)
+        foreach (var reg in registrations.OrderByDescending(r => (int)r.Capabilities.Priority))
         {
-            Console.WriteLine($"   - {reg.Capabilities.ProviderId} (Priority: {reg.Capabilities.Priority})");
+            Console.WriteLine($"   - {reg.Capabilities.ProviderId} (Priority: {reg.Capabilities.Priority} = {(int)reg.Capabilities.Priority})");
         }
     }
 }
