@@ -5,6 +5,7 @@
         "Yokan.PintoBean.Abstractions",
         "Yokan.PintoBean.CodeGen", 
         "Yokan.PintoBean.Runtime",
+        "Yokan.PintoBean.Runtime.Unity",
         "Yokan.PintoBean.Providers.Stub"
     ],
     "includePlatforms": [],
