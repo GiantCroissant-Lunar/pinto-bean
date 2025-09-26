@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>PintoBean.Resources.Demo.Console</RootNamespace>
+    <PackageId>GiantCroissant.PintoBean.Resources.Demo.Console</PackageId>
+    <Description>P5-02: Resources sample demonstrating PickOne selection strategy with resilience fallback</Description>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Yokan.PintoBean.Abstractions/Yokan.PintoBean.Abstractions.csproj" />
+    <ProjectReference Include="../../src/Yokan.PintoBean.Runtime/Yokan.PintoBean.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+</Project>
