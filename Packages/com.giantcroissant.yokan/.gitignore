@@ -1,0 +1,13 @@
+# Unity build artifacts
+bin/
+obj/
+*.csproj
+*.csproj.user
+
+# Unity generated files
+Library/
+Temp/
+Obj/
+Logs/
+Build/
+*.meta

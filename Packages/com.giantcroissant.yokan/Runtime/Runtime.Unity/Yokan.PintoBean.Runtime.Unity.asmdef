@@ -1,0 +1,20 @@
+{
+    "name": "Yokan.PintoBean.Runtime.Unity",
+    "rootNamespace": "Yokan.PintoBean.Runtime.Unity",
+    "references": [
+        "Yokan.PintoBean.Abstractions",
+        "Yokan.PintoBean.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Microsoft.Extensions.DependencyInjection.dll",
+        "Microsoft.Extensions.DependencyInjection.Abstractions.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
