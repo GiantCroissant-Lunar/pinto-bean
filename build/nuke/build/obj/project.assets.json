@@ -5884,15 +5884,15 @@
         "downloadDependencies": [
           {
             "name": "Microsoft.AspNetCore.App.Ref",
-            "version": "[8.0.10, 8.0.10]"
+            "version": "[8.0.20, 8.0.20]"
           },
           {
             "name": "Microsoft.NETCore.App.Host.linux-x64",
-            "version": "[8.0.10, 8.0.10]"
+            "version": "[8.0.20, 8.0.20]"
           },
           {
             "name": "Microsoft.NETCore.App.Ref",
-            "version": "[8.0.10, 8.0.10]"
+            "version": "[8.0.20, 8.0.20]"
           }
         ],
         "frameworkReferences": {
@@ -5900,7 +5900,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/home/runner/work/pinto-bean/.codeql-scratch/dbs/csharp/working/.dotnet/sdk/8.0.403/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/home/runner/work/pinto-bean/.codeql-scratch/dbs/csharp/working/.dotnet/sdk/8.0.414/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

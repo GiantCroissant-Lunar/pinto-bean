@@ -1,0 +1,19 @@
+{
+    "name": "PintoBean.Unity.Sample",
+    "rootNamespace": "PintoBean.Unity.Sample",
+    "references": [
+        "Yokan.PintoBean.Abstractions",
+        "Yokan.PintoBean.CodeGen", 
+        "Yokan.PintoBean.Runtime",
+        "Yokan.PintoBean.Providers.Stub"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
