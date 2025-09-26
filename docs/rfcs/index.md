@@ -15,6 +15,7 @@ This directory contains architectural decision documents and proposals for the Y
 | Guide | Description |
 |-------|-------------|
 | [Selection Strategies Quickstart](../selection-strategies-quickstart.md) | Practical guide for implementing PickOne, FanOut, and Sharded strategies with DI configuration examples |
+| [Hot-Swap Playbook](../hot-swap-playbook.md) | Operational guide for hot-swapping plugins in Unity and .NET environments |
 
 ## RFC Process
 
