@@ -14,6 +14,7 @@ This directory contains architectural decision documents and proposals for the Y
 
 | Guide | Description |
 |-------|-------------|
+| [Samples Quickstart](../samples-quickstart.md) | Run instructions for each sample and how strategies affect routing behavior |
 | [Selection Strategies Quickstart](../selection-strategies-quickstart.md) | Practical guide for implementing PickOne, FanOut, and Sharded strategies with DI configuration examples |
 | [Hot-Swap Playbook](../hot-swap-playbook.md) | Operational guide for hot-swapping plugins in Unity and .NET environments |
 

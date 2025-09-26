@@ -134,6 +134,7 @@ See [RFCs](docs/rfcs/) for detailed architecture documentation.
 
 ### Quick Start Guides
 
+- **[Samples Quickstart](docs/samples-quickstart.md)** - Run instructions for each sample and how strategies affect routing
 - **[Selection Strategies Quickstart](docs/selection-strategies-quickstart.md)** - Learn how to configure PickOne, FanOut, and Sharded strategies with DI
 - **[Hot-Swap Playbook](docs/hot-swap-playbook.md)** - Operational guide for hot-swapping plugins in Unity and .NET environments
 
