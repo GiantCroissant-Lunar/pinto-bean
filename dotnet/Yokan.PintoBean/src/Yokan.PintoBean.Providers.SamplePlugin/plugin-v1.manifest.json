@@ -1,0 +1,16 @@
+{
+  "id": "sample-hello-v1",
+  "version": "1.0.0",
+  "name": "Sample Hello Plugin v1",
+  "description": "Sample plugin implementation of IHelloService with basic functionality",
+  "author": "PintoBean Team",
+  "assemblies": [
+    "Yokan.PintoBean.Providers.SamplePlugin.dll"
+  ],
+  "capabilities": [
+    "hello-service",
+    "greeting"
+  ],
+  "entryType": "Yokan.PintoBean.Providers.SamplePlugin.SampleHelloProvider",
+  "contractVersion": "0.1.0"
+}
