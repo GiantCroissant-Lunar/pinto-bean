@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Yokan.PintoBean.Benchmarks"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PintoBean.Resources.Demo.Console", "samples\PintoBean.Resources.Demo.Console\PintoBean.Resources.Demo.Console.csproj", "{7870B5A2-AE0E-4296-A51C-69165E53FA52}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PintoBean.SceneFlow.Demo.Console", "samples\PintoBean.SceneFlow.Demo.Console\PintoBean.SceneFlow.Demo.Console.csproj", "{F23EE118-67E9-470E-BF68-EE25D9B7F078}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -92,6 +94,10 @@ Global
 		{7870B5A2-AE0E-4296-A51C-69165E53FA52}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7870B5A2-AE0E-4296-A51C-69165E53FA52}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7870B5A2-AE0E-4296-A51C-69165E53FA52}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F23EE118-67E9-470E-BF68-EE25D9B7F078}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F23EE118-67E9-470E-BF68-EE25D9B7F078}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F23EE118-67E9-470E-BF68-EE25D9B7F078}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F23EE118-67E9-470E-BF68-EE25D9B7F078}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{DBAAD1D2-4B7B-427E-86BC-AEBC3B3B9674} = {AA147821-13D8-4A05-B5E6-83AD4D6EF5BD}
@@ -106,5 +112,6 @@ Global
 		{4D8B1073-957F-429E-8774-707FD8540C70} = {3A707568-2339-4213-8BE0-A0AC85385B1E}
 		{E209B9BA-C01B-4E6C-8F08-4148EBE03740} = {C71DAB0E-B966-4680-A850-92815F50ABFA}
 		{7870B5A2-AE0E-4296-A51C-69165E53FA52} = {76D0C0B6-075F-4BAC-BB8A-190C97558C24}
+		{F23EE118-67E9-470E-BF68-EE25D9B7F078} = {76D0C0B6-075F-4BAC-BB8A-190C97558C24}
 	EndGlobalSection
 EndGlobal

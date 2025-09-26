@@ -5,4 +5,8 @@
     <Description>Tier-1 contracts and abstractions for Yokan PintoBean service platform</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../Yokan.PintoBean.CodeGen/Yokan.PintoBean.CodeGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+  </ItemGroup>
+
 </Project>
