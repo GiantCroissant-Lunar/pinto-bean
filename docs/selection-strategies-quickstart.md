@@ -45,6 +45,8 @@ var resourceService = serviceProvider.GetService<IResourceService>();
 var data = await resourceService.LoadAsync("player-config.json");
 ```
 
+> **📖 Complete Example**: See [P5-02 Resources Sample](../dotnet/Yokan.PintoBean/samples/PintoBean.Resources.Demo.Console/) for a comprehensive demonstration of PickOne selection with resilience patterns and dynamic provider fallback.
+
 #### FanOut
 Invokes **all** matched providers and aggregates results/failures:
 
