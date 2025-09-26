@@ -51,6 +51,30 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Configures selection strategies with Unity ScriptableObject assets.
+    /// This method loads StrategyMappingAsset and ShardMapAsset resources and applies them to SelectionStrategyOptions.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="forceReimport">Whether to force reimport of configuration assets.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when services is null.</exception>
+    public static IServiceCollection AddUnityStrategyConfiguration(this IServiceCollection services, bool forceReimport = false)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        // Ensure selection strategies are registered first
+        services.AddSelectionStrategies();
+
+        // Register a post-configuration callback that imports Unity ScriptableObject assets
+        services.PostConfigure<SelectionStrategyOptions>(options =>
+        {
+            StrategyConfigImporter.ImportStrategyConfiguration(options, forceReimport);
+        });
+
+        return services;
+    }
 }
 
 /// <summary>
