@@ -5,6 +5,8 @@ using Yokan.PintoBean.CodeGen;
 using Yokan.PintoBean.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace PintoBean.Analytics.Demo.Console;
 
@@ -19,20 +21,34 @@ public partial class Analytics : IAnalytics
     private readonly IServiceRegistry _registry;
     private readonly IResilienceExecutor _resilienceExecutor;
     private readonly IAspectRuntime _aspectRuntime;
+    private readonly ISelectionStrategyFactory _strategyFactory;
 
-    public Analytics(IServiceRegistry registry, IResilienceExecutor resilienceExecutor, IAspectRuntime aspectRuntime)
+    public Analytics(IServiceRegistry registry, IResilienceExecutor resilienceExecutor, IAspectRuntime aspectRuntime, ISelectionStrategyFactory strategyFactory)
     {
         _registry = registry;
         _resilienceExecutor = resilienceExecutor;
         _aspectRuntime = aspectRuntime;
+        _strategyFactory = strategyFactory;
     }
 
     public async Task Track(AnalyticsEvent analyticsEvent, CancellationToken cancellationToken = default)
     {
-        // Delegate to the service registry with proper strategy routing
-        // The registry will automatically apply the selected strategy (FanOut/Sharded)
-        await _registry.For<IAnalytics>().InvokeAsync(
-            async (provider, ct) => await provider.Track(analyticsEvent, ct),
-            cancellationToken);
+        // Get the strategy and use it to select providers
+        var strategy = _strategyFactory.CreateStrategy<IAnalytics>();
+        var registrations = _registry.GetRegistrations<IAnalytics>().ToList();
+        
+        // Add metadata for sharded strategy (event name for shard key extraction)
+        var metadata = new Dictionary<string, object>
+        {
+            ["EventName"] = analyticsEvent.EventName
+        };
+        var context = new SelectionContext<IAnalytics>(registrations, metadata);
+        var result = strategy.SelectProviders(context);
+
+        // Invoke all selected providers (this supports FanOut and Sharded properly)
+        var tasks = result.SelectedProviders.Select(provider => 
+            provider.Track(analyticsEvent, cancellationToken));
+        
+        await Task.WhenAll(tasks);
     }
 }
