@@ -1,0 +1,33 @@
+{
+  "name": "com.giantcroissant.yokan",
+  "displayName": "Yokan PintoBean",
+  "version": "1.0.0",
+  "description": "Cross-engine service platform with 4-tier architecture for Unity, Godot, and custom .NET applications. Provides service registry, telemetry seams, and resilience patterns.",
+  "unity": "2022.3",
+  "keywords": [
+    "service",
+    "platform",
+    "dependency-injection",
+    "telemetry",
+    "resilience",
+    "architecture"
+  ],
+  "category": "Framework",
+  "dependencies": {},
+  "repository": {
+    "type": "git", 
+    "url": "https://github.com/GiantCroissant-Lunar/pinto-bean.git"
+  },
+  "author": {
+    "name": "GiantCroissant",
+    "url": "https://github.com/GiantCroissant-Lunar"
+  },
+  "license": "MIT",
+  "samples": [
+    {
+      "displayName": "Unity Integration Sample",
+      "description": "Demonstrates Unity integration with PintoBean service platform",
+      "path": "Samples~/Unity"
+    }
+  ]
+}

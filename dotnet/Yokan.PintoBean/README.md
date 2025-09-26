@@ -57,6 +57,14 @@ The console sample demonstrates both baseline and full observability modes, show
 - Timing capture and retry attempt logging
 - Provider registration and selection strategies
 
+## Unity Integration
+
+For Unity developers, see the [Unity Integration Guide](../../UNITY.md) for:
+- UPM package installation via git URL
+- Assembly definition setup
+- Service-aware MonoBehaviour patterns
+- Unity-specific bootstrap examples
+
 ## Documentation
 
 See [RFCs](docs/rfcs/) for detailed architecture documentation:

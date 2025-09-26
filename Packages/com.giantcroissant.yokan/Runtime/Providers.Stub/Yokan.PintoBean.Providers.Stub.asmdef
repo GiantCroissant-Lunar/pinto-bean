@@ -1,0 +1,17 @@
+{
+    "name": "Yokan.PintoBean.Providers.Stub",
+    "rootNamespace": "Yokan.PintoBean.Providers.Stub",
+    "references": [
+        "Yokan.PintoBean.Abstractions",
+        "Yokan.PintoBean.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
