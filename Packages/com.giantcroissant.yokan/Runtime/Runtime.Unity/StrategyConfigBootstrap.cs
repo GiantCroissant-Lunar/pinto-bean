@@ -9,6 +9,7 @@ namespace Yokan.PintoBean.Runtime.Unity
     /// MonoBehaviour component that automatically imports strategy configuration from ScriptableObject assets
     /// when the component starts in a Unity scene. This provides a simple way to configure PintoBean
     /// strategies without requiring custom service registration code.
+    /// Supports Game vs Editor profiles based on Application.isEditor && !Application.isPlaying detection.
     /// </summary>
     [AddComponentMenu("PintoBean/Strategy Config Bootstrap")]
     public class StrategyConfigBootstrap : MonoBehaviour
@@ -23,10 +24,22 @@ namespace Yokan.PintoBean.Runtime.Unity
         [Tooltip("Optional SelectionStrategyOptions instance to configure. If null, will try to find or create one.")]
         [SerializeField] private SelectionStrategyOptions targetOptions = null;
 
+        [Header("Profile Assets")]
+        [Tooltip("Game profile asset to use when in Play mode (Application.isPlaying = true)")]
+        [SerializeField] private GameProfileAsset gameProfile = null;
+
+        [Tooltip("Editor profile asset to use when in Editor mode (Application.isEditor = true && Application.isPlaying = false)")]
+        [SerializeField] private EditorProfileAsset editorProfile = null;
+
+        [Tooltip("Optional PollyResilienceExecutorOptions instance to configure. If null, will try to find or create one.")]
+        [SerializeField] private PollyResilienceExecutorOptions targetResilienceOptions = null;
+
         [Header("Runtime Info")]
         [SerializeField, ReadOnly] private bool hasImported = false;
         [SerializeField, ReadOnly] private int strategyAssetsFound = 0;
         [SerializeField, ReadOnly] private int shardAssetsFound = 0;
+        [SerializeField, ReadOnly] private string selectedProfile = "None";
+        [SerializeField, ReadOnly] private string detectedMode = "Unknown";
 
         /// <summary>
         /// Gets whether this bootstrap component has successfully imported configuration.
@@ -43,9 +56,50 @@ namespace Yokan.PintoBean.Runtime.Unity
         /// </summary>
         public int ShardAssetsFound => shardAssetsFound;
 
+        /// <summary>
+        /// Gets the selected profile name for display purposes.
+        /// </summary>
+        public string SelectedProfile => selectedProfile;
+
+        /// <summary>
+        /// Gets the detected Unity mode for display purposes.
+        /// </summary>
+        public string DetectedMode => detectedMode;
+
         private void Start()
         {
+            DetectUnityMode();
             ImportConfiguration();
+        }
+
+        /// <summary>
+        /// Detects the current Unity mode and updates display values.
+        /// </summary>
+        private void DetectUnityMode()
+        {
+            bool isEditorMode = Application.isEditor && !Application.isPlaying;
+            bool isPlayMode = Application.isPlaying;
+
+            if (isEditorMode)
+            {
+                detectedMode = "Editor";
+                selectedProfile = editorProfile != null ? editorProfile.name : "None (Editor)";
+            }
+            else if (isPlayMode)
+            {
+                detectedMode = "Play";
+                selectedProfile = gameProfile != null ? gameProfile.name : "None (Game)";
+            }
+            else
+            {
+                detectedMode = "Unknown";
+                selectedProfile = "None";
+            }
+
+            if (verboseLogging)
+            {
+                Debug.Log($"[StrategyConfigBootstrap] Detected Unity mode: {detectedMode}, Selected profile: {selectedProfile}");
+            }
         }
 
         /// <summary>
@@ -61,6 +115,9 @@ namespace Yokan.PintoBean.Runtime.Unity
 
             try
             {
+                // Detect mode if not already done
+                DetectUnityMode();
+
                 // Get or create target options
                 var options = GetOrCreateOptions();
                 if (options == null)
@@ -69,10 +126,16 @@ namespace Yokan.PintoBean.Runtime.Unity
                     return;
                 }
 
+                // Get or create resilience options
+                var resilienceOptions = GetOrCreateResilienceOptions();
+
+                // Apply profile-specific settings first
+                ApplyProfileSettings(options, resilienceOptions);
+
                 // Count available assets before import
                 CountAvailableAssets();
 
-                // Import configuration
+                // Import configuration from strategy mapping assets
                 StrategyConfigImporter.ImportStrategyConfiguration(options, forceReimport);
 
                 hasImported = true;
@@ -91,14 +154,84 @@ namespace Yokan.PintoBean.Runtime.Unity
         }
 
         /// <summary>
-        /// Clears the imported flag and allows re-import on next call.
+        /// Applies profile-specific settings based on the detected Unity mode.
         /// </summary>
-        [ContextMenu("Clear Import Flag")]
-        public void ClearImportFlag()
+        /// <param name="options">The SelectionStrategyOptions to configure.</param>
+        /// <param name="resilienceOptions">The PollyResilienceExecutorOptions to configure.</param>
+        private void ApplyProfileSettings(SelectionStrategyOptions options, PollyResilienceExecutorOptions resilienceOptions)
         {
-            StrategyConfigImporter.ClearImportedFlag();
-            hasImported = false;
-            Debug.Log($"[StrategyConfigBootstrap] Cleared import flag on {gameObject.name}");
+            bool isEditorMode = Application.isEditor && !Application.isPlaying;
+
+            if (isEditorMode && editorProfile != null)
+            {
+                if (verboseLogging)
+                {
+                    Debug.Log($"[StrategyConfigBootstrap] Applying Editor profile: {editorProfile.name}");
+                }
+                
+                editorProfile.ApplyToSelectionOptions(options);
+                
+                if (resilienceOptions != null)
+                {
+                    editorProfile.ApplyToResilienceOptions(resilienceOptions);
+                }
+            }
+            else if (!isEditorMode && gameProfile != null)
+            {
+                if (verboseLogging)
+                {
+                    Debug.Log($"[StrategyConfigBootstrap] Applying Game profile: {gameProfile.name}");
+                }
+                
+                gameProfile.ApplyToSelectionOptions(options);
+                
+                if (resilienceOptions != null)
+                {
+                    gameProfile.ApplyToResilienceOptions(resilienceOptions);
+                }
+            }
+            else
+            {
+                if (verboseLogging)
+                {
+                    string mode = isEditorMode ? "Editor" : "Game";
+                    Debug.LogWarning($"[StrategyConfigBootstrap] No {mode} profile asset assigned. Using default settings.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or creates PollyResilienceExecutorOptions instance.
+        /// </summary>
+        /// <returns>The PollyResilienceExecutorOptions instance, or null if not available.</returns>
+        private PollyResilienceExecutorOptions GetOrCreateResilienceOptions()
+        {
+            // Use target resilience options if specified
+            if (targetResilienceOptions != null)
+            {
+                return targetResilienceOptions;
+            }
+
+            // Try to find an existing resilience options instance
+            var existingHolder = FindObjectOfType<ResilienceOptionsHolder>();
+            if (existingHolder != null)
+            {
+                return existingHolder.Options;
+            }
+
+            // Create a new resilience options instance
+            var newOptions = new PollyResilienceExecutorOptions();
+            
+            // Optionally create a holder component to keep the options around
+            var holder = gameObject.AddComponent<ResilienceOptionsHolder>();
+            holder.Options = newOptions;
+            
+            if (verboseLogging)
+            {
+                Debug.Log($"[StrategyConfigBootstrap] Created new PollyResilienceExecutorOptions instance on {gameObject.name}");
+            }
+
+            return newOptions;
         }
 
         private SelectionStrategyOptions GetOrCreateOptions()
@@ -187,6 +320,26 @@ namespace Yokan.PintoBean.Runtime.Unity
     {
         [System.NonSerialized]
         public SelectionStrategyOptions Options;
+
+        private void Awake()
+        {
+            // Ensure we don't destroy this object when loading new scenes
+            if (Options != null)
+            {
+                DontDestroyOnLoad(gameObject);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Component that holds a PollyResilienceExecutorOptions instance.
+    /// This is used to keep the resilience options around when created by StrategyConfigBootstrap.
+    /// </summary>
+    [System.Serializable]
+    public class ResilienceOptionsHolder : MonoBehaviour
+    {
+        [System.NonSerialized]
+        public PollyResilienceExecutorOptions Options;
 
         private void Awake()
         {
