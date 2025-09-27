@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using Yokan.PintoBean.Abstractions;
 
 namespace Yokan.PintoBean.Runtime;
 
@@ -434,6 +435,49 @@ public static class ServiceCollectionExtensions
         if (services == null) throw new ArgumentNullException(nameof(services));
 
         services.TryAddSingleton<IAspectRuntime>(NoOpAspectRuntime.Instance);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds AI text service registry support with PickOne default strategy and capability tag support.
+    /// Configures the service registry for AI text providers with model family and context window capabilities.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when services is null.</exception>
+    public static IServiceCollection AddAIRegistry(this IServiceCollection services)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        // Ensure base registry services are registered
+        services.AddServiceRegistry();
+        services.AddSelectionStrategies();
+
+        // Configure PickOne as default strategy for IAIText
+        services.UsePickOneFor<IAIText>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds AI text service registry support with custom configuration.
+    /// Allows configuring specific providers with capability tags for model family and context window requirements.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="configure">Action to configure AI text providers and their capabilities.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when services or configure is null.</exception>
+    public static IServiceCollection AddAIRegistry(this IServiceCollection services, Action<IServiceRegistry> configure)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (configure == null) throw new ArgumentNullException(nameof(configure));
+
+        // Add base AI registry support
+        services.AddAIRegistry();
+
+        // Configure the registry with provided action
+        services.AddServiceRegistry(configure);
 
         return services;
     }
