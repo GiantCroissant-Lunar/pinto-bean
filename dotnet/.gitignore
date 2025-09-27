@@ -39,3 +39,7 @@ TestResult.xml
 # Build and compile output
 **/bin/**
 **/obj/**
+
+# IDE directories
+.idea/
+*/.idea/

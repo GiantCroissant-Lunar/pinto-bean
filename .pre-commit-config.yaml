@@ -55,8 +55,6 @@ repos:
         stages: [commit-msg]
         additional_dependencies: ["commitizen"]
 
-  # Removed dotnet-format hook (no .NET projects present). Re-add when solution exists.
-
   - repo: local
     hooks:
       - id: secrets-validator
@@ -95,6 +93,23 @@ repos:
         language: python
         entry: python scripts/python/tools/hooks/binary_blocker.py
         pass_filenames: false
+      - id: node-biome-check
+        name: "Node: biome check"
+        language: system
+        entry: python scripts/python/tools/hooks/biome_check.py
+        pass_filenames: true
+        types_or: [javascript, jsx, ts, tsx, json]
+
+      - id: dotnet-format
+        name: ".NET: dotnet format (verify)"
+        language: system
+        entry: python scripts/python/tools/hooks/dotnet_format_wrapper.py
+        pass_filenames: true
+      - id: resharper-cleanupcode
+        name: ".NET: ReSharper cleanupcode"
+        language: system
+        entry: python scripts/python/tools/hooks/resharper_cleanupcode.py
+        pass_filenames: true
       - id: terraform-provider-version-check
         name: "Terraform: enforce provider version constraints"
         language: python

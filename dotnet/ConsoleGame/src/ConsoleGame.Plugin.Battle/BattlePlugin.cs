@@ -9,6 +9,10 @@ namespace ConsoleGame.Plugin.Battle;
 public sealed class BattlePlugin : IPlugin, IRuntimePlugin, IDisposable
 {
     private ILogger<BattlePlugin>? _logger;
+    private IServiceProvider? _serviceProvider;
+    private IServiceScope? _serviceScope;
+    private ServiceProvider? _fallbackProvider;
+    private bool _disposed;
 
     public BattlePlugin(ILogger<BattlePlugin>? logger = null)
     {
@@ -23,27 +27,83 @@ public sealed class BattlePlugin : IPlugin, IRuntimePlugin, IDisposable
 
     public Task ConfigureAsync(CancellationToken cancellationToken = default)
     {
-        var logger = _logger ??= ResolveLogger(Context?.Services);
+        var logger = GetLogger();
         logger.LogInformation("Battle plugin configured for directory {Directory}", Context?.PluginDirectory ?? "(unknown)");
         return Task.CompletedTask;
     }
 
     public Task RunAsync(CancellationToken cancellationToken = default)
     {
-        var logger = _logger ??= ResolveLogger(Context?.Services);
+        var logger = GetLogger();
         logger.LogDebug("Battle plugin RunAsync invoked");
         return Task.CompletedTask;
     }
 
-    private static ILogger<BattlePlugin> ResolveLogger(IServiceProvider? services)
-    {
-        return services?.GetService<ILogger<BattlePlugin>>()
-            ?? BattleComposition.ResolveOrDefault<ILogger<BattlePlugin>>(services)
-            ?? NullLogger<BattlePlugin>.Instance;
-    }
-
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _serviceScope?.Dispose();
+        _serviceScope = null;
+
+        _fallbackProvider?.Dispose();
+        _fallbackProvider = null;
+
+        _serviceProvider = null;
+        _logger = null;
+
         BattleComposition.Reset();
+    }
+
+    private ILogger<BattlePlugin> GetLogger()
+    {
+        if (_logger is not null)
+        {
+            return _logger;
+        }
+
+        var provider = EnsureServiceProvider();
+        _logger = provider.GetRequiredService<ILogger<BattlePlugin>>();
+        return _logger;
+    }
+
+    private IServiceProvider EnsureServiceProvider()
+    {
+        if (_serviceProvider is not null)
+        {
+            return _serviceProvider;
+        }
+
+        var services = Context?.Services;
+        if (services is not null)
+        {
+            var scopeFactory = services.GetService<IServiceScopeFactory>();
+            if (scopeFactory is not null)
+            {
+                _serviceScope = scopeFactory.CreateScope();
+                _serviceProvider = _serviceScope.ServiceProvider;
+                return _serviceProvider;
+            }
+
+            _serviceProvider = services;
+            return _serviceProvider;
+        }
+
+        _fallbackProvider = BuildFallbackProvider();
+        _serviceProvider = _fallbackProvider;
+        return _serviceProvider;
+    }
+
+    private static ServiceProvider BuildFallbackProvider()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddBattleSubsystem();
+        return services.BuildServiceProvider();
     }
 }

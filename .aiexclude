@@ -1,0 +1,41 @@
+# Build artifacts and generated files
+**/bin/
+**/obj/
+**/Build/
+**/Library/
+**/Temp/
+**/node_modules/
+**/dist/
+**/.next/
+**/.terraform/
+
+# Cache directories
+**/.mypy_cache/
+**/.ruff_cache/
+**/.pytest_cache/
+
+# Lock files and binaries
+*.lock
+*.bin
+*.dll
+*.pdb
+*.exe
+
+# IDE and tool files
+.idea/
+.vscode/
+*.suo
+*.user
+
+# Logs and temporary files
+*.log
+unload.log
+
+# Environment and secrets (if any)
+.env*
+*.key
+*.pem
+apikeys.txt
+
+# Local development tools
+**/scripts/python/tools/hooks/

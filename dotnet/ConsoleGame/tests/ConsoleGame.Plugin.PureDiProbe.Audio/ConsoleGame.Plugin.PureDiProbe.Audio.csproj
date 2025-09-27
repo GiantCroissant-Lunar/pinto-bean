@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ConsoleGame.Plugin.PureDiProbe.Core\ConsoleGame.Plugin.PureDiProbe.Core.csproj" />
+    <ProjectReference Include="..\..\src\ConsoleGame.Plugin.Audio\ConsoleGame.Plugin.Audio.csproj" />
+  </ItemGroup>
+</Project>

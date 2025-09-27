@@ -16,7 +16,7 @@ internal static partial class BattleComposition
         ILogger<BattlePlugin> CreateLogger()
         {
             var factory = services?.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance;
-            return factory.CreateLogger<BattlePlugin>();
+            return BattlePureDiAdapter.CreateLogger(factory);
         }
     }
 

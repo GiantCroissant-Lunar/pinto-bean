@@ -1,0 +1,24 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.8.0/schema.json",
+  "files": {
+    "ignore": [
+      "**/node_modules/**",
+      "**/.pnpm/**",
+      "**/dist/**",
+      "**/.astro/**",
+      "**/*.astro"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  }
+}

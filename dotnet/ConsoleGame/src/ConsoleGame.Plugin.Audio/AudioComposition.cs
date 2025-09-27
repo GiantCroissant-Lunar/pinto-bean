@@ -21,20 +21,28 @@ internal static partial class AudioComposition
 
     private static IAudioService CreateAudioService(IServiceProvider? services)
     {
-        var options = services?.GetService<IOptions<AudioOptions>>()?.Value ?? new AudioOptions();
+        var options = services?.GetService<IOptions<AudioOptions>>()?.Value ?? CreateDefaultAudioOptions();
         var loggerFactory = services?.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance;
+        var audio = AudioPureDiAdapter.CreateAudioService(options, loggerFactory);
+        return Track(audio);
+    }
 
-        if (!options.Enabled)
+    private static AudioOptions CreateDefaultAudioOptions()
+    {
+        var options = new AudioOptions();
+        var disableAudioEnv = Environment.GetEnvironmentVariable("CONSOLEGAME_DISABLE_AUDIO");
+        if (!string.IsNullOrWhiteSpace(disableAudioEnv) && disableAudioEnv.Equals("1", StringComparison.OrdinalIgnoreCase))
         {
-            var logger = loggerFactory.CreateLogger<NoAudioService>();
-            var reason = string.IsNullOrWhiteSpace(options.DisableReason)
-                ? "Audio disabled via configuration"
-                : options.DisableReason!;
-            return Track(new NoAudioService(logger, reason));
+            options.Enabled = false;
+            options.DisableReason = "Disabled via CONSOLEGAME_DISABLE_AUDIO=1";
+        }
+        else if (!string.IsNullOrWhiteSpace(disableAudioEnv) && disableAudioEnv.Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            options.Enabled = false;
+            options.DisableReason = "Disabled via CONSOLEGAME_DISABLE_AUDIO=true";
         }
 
-        var libLogger = loggerFactory.CreateLogger<LibVlcAudioService>();
-        return Track(new LibVlcAudioService(libLogger));
+        return options;
     }
 
     private static T Track<T>(T instance) where T : IDisposable

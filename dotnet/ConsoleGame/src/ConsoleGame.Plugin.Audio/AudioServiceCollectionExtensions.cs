@@ -34,7 +34,12 @@ public static class AudioServiceCollectionExtensions
             })
             .ValidateDataAnnotations();
 
-        services.AddSingleton(provider => AudioComposition.Resolve<IAudioService>(provider));
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<AudioOptions>>().Value;
+            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+            return AudioPureDiAdapter.CreateAudioService(options, loggerFactory);
+        });
         services.AddHostedService<AudioCompositionCleanupHostedService>();
 
         return services;

@@ -1,0 +1,76 @@
+name: console-game-asciinema
+
+on:
+  workflow_dispatch:
+
+jobs:
+  record-dungeon-demo:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 preview
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+
+      - name: Install asciinema and tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y asciinema
+          curl -sSL -o /usr/local/bin/agg \
+            https://github.com/asciinema/agg/releases/latest/download/agg-x86_64-unknown-linux-gnu
+          chmod +x /usr/local/bin/agg
+
+      - name: Restore ConsoleGame dependencies
+        run: dotnet restore dotnet/ConsoleGame/src/ConsoleGame.App/ConsoleGame.App.csproj
+
+      - name: Build ConsoleGame demo projects
+        run: |
+          dotnet build dotnet/ConsoleGame/src/ConsoleGame.TerminalLib/ConsoleGame.TerminalLib.csproj \
+            --configuration Release --nologo
+          dotnet build dotnet/ConsoleGame/src/ConsoleGame.Dungeon.Plugin/ConsoleGame.Dungeon.Plugin.csproj \
+            --configuration Release --nologo
+          dotnet build dotnet/ConsoleGame/src/ConsoleGame.App/ConsoleGame.App.csproj \
+            --configuration Release --nologo --no-restore
+
+      - name: Record asciinema session
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          record_command="dotnet run --project dotnet/ConsoleGame/src/ConsoleGame.App/ConsoleGame.App.csproj --configuration Release --no-build"
+          {
+            sleep 1
+            printf '\n'
+            sleep 1
+            printf '\033[B'
+            sleep 0.6
+            printf '\033[C'
+            sleep 0.6
+            printf '\033[A'
+            sleep 0.6
+            printf '\033[D'
+            sleep 0.6
+            printf '\033[B'
+            sleep 0.6
+            printf '\033[C'
+            sleep 1
+            printf '\033'
+            sleep 0.5
+          } | asciinema rec --stdin --quiet --title "ConsoleGame Dungeon demo" --command "$record_command" artifacts/console-game-dungeon.cast
+
+      - name: Generate animated GIF preview
+        run: agg artifacts/console-game-dungeon.cast artifacts/console-game-dungeon.gif
+
+      - name: Upload recording artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-game-dungeon-demo
+          path: |
+            artifacts/console-game-dungeon.cast
+            artifacts/console-game-dungeon.gif

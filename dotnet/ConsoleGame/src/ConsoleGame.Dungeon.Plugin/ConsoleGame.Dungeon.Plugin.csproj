@@ -4,15 +4,18 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\ConsoleGame.Contracts\ConsoleGame.Contracts.csproj" />
+    <ProjectReference Include="..\ConsoleGame.Plugin.Audio\ConsoleGame.Plugin.Audio.csproj" />
+    <ProjectReference Include="..\ConsoleGame.Dungeon.Logging\ConsoleGame.Dungeon.Logging.csproj" />
+    <ProjectReference Include="..\ConsoleGame.Dungeon.Core\ConsoleGame.Dungeon.Core.csproj" />
+    <ProjectReference Include="..\ConsoleGame.Dungeon.UI.Terminal\ConsoleGame.Dungeon.UI.Terminal.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Terminal.Gui" Version="2.0.0" />
     <PackageReference Include="System.Reactive" Version="6.0.0" />
-    <PackageReference Include="LibVLCSharp" Version="3.8.4" />
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.20" />
     <PackageReference Include="Splat" Version="15.1.1" />
   </ItemGroup>
   <ItemGroup>

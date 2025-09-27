@@ -1,0 +1,7 @@
+# Terminal.Gui package files and extracts
+terminal.gui.zip
+terminal_gui_pkg/
+
+# Build outputs
+bin/
+obj/

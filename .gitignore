@@ -31,3 +31,9 @@ dist/
 
 # Unity projects (generated/temp files)
 projects/unity-complete/
+
+# IDE directories
+.idea/
+
+# Reference projects (external dependencies)
+ref-projects/
