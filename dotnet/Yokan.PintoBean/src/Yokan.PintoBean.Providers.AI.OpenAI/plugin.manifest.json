@@ -1,0 +1,21 @@
+{
+  "id": "openai-text-v1",
+  "version": "1.0.0",
+  "name": "OpenAI Text Provider",
+  "description": "Tier-4 OpenAI provider for AI text generation via OpenAI API",
+  "author": "PintoBean Team",
+  "assemblies": [
+    "Yokan.PintoBean.Providers.AI.OpenAI.dll"
+  ],
+  "capabilities": [
+    "ai-text",
+    "gpt-family",
+    "context-window-128k",
+    "cost-tier-medium",
+    "streaming",
+    "conversation",
+    "completion"
+  ],
+  "entryType": "Yokan.PintoBean.Providers.AI.OpenAI.OpenAITextProvider",
+  "contractVersion": "0.1.0"
+}
