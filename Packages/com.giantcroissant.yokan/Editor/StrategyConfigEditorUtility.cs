@@ -57,6 +57,38 @@ namespace Yokan.PintoBean.Editor
             EditorGUIUtility.PingObject(asset);
         }
 
+        [MenuItem("PintoBean/Create Game Profile Asset", priority = 3)]
+        public static void CreateGameProfileAsset()
+        {
+            EnsureConfigDirectory();
+            string assetPath = CreateUniqueAssetPath(PintoBeanConfigPath, "GameProfile", "asset");
+            
+            var asset = ScriptableObject.CreateInstance<GameProfileAsset>();
+            AssetDatabase.CreateAsset(asset, assetPath);
+            AssetDatabase.SaveAssets();
+            
+            Debug.Log($"[StrategyConfigEditor] Created GameProfileAsset at {assetPath}");
+            
+            Selection.activeObject = asset;
+            EditorGUIUtility.PingObject(asset);
+        }
+
+        [MenuItem("PintoBean/Create Editor Profile Asset", priority = 4)]
+        public static void CreateEditorProfileAsset()
+        {
+            EnsureConfigDirectory();
+            string assetPath = CreateUniqueAssetPath(PintoBeanConfigPath, "EditorProfile", "asset");
+            
+            var asset = ScriptableObject.CreateInstance<EditorProfileAsset>();
+            AssetDatabase.CreateAsset(asset, assetPath);
+            AssetDatabase.SaveAssets();
+            
+            Debug.Log($"[StrategyConfigEditor] Created EditorProfileAsset at {assetPath}");
+            
+            Selection.activeObject = asset;
+            EditorGUIUtility.PingObject(asset);
+        }
+
         [MenuItem("PintoBean/Create Shard Map Asset", priority = 3)]
         public static void CreateShardMapAsset()
         {
