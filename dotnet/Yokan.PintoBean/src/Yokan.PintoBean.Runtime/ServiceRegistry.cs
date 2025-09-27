@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -232,6 +233,18 @@ internal sealed class TypedServiceRegistry<TService> : IServiceRegistry<TService
 
         var provider = SelectProvider();
         await func(provider, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async IAsyncEnumerable<TResult> InvokeStreamAsync<TResult>(Func<TService, CancellationToken, IAsyncEnumerable<TResult>> func, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (func == null) throw new ArgumentNullException(nameof(func));
+
+        var provider = SelectProvider();
+        await foreach (var result in func(provider, cancellationToken))
+        {
+            yield return result;
+        }
     }
 
     /// <inheritdoc />
