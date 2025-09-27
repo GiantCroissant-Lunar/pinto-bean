@@ -63,6 +63,22 @@ namespace Yokan.PintoBean.Runtime.Unity
         [Tooltip("Sampling rate for performance metrics (0.0 - 1.0)")]
         [SerializeField, Range(0.0f, 1.0f)] private float samplingRate = 0.1f;
 
+        [Header("Aspect Runtime Settings")]
+        [Tooltip("Type of aspect runtime to use for telemetry and logging in Game mode")]
+        [SerializeField] private AspectRuntimeType aspectRuntimeType = AspectRuntimeType.Unity;
+        
+        [Tooltip("Enable metrics recording in aspect runtime")]
+        [SerializeField] private bool enableMetrics = true;
+        
+        [Tooltip("Enable verbose logging in aspect runtime")]
+        [SerializeField] private bool verboseLogging = false;
+        
+        [Tooltip("ActivitySource name for OpenTelemetry tracing (used when AspectRuntimeType is OpenTelemetry or Adaptive)")]
+        [SerializeField] private string activitySourceName = "PintoBean.Game";
+        
+        [Tooltip("Meter name for OpenTelemetry metrics (used when AspectRuntimeType is OpenTelemetry or Adaptive)")]
+        [SerializeField] private string meterName = "PintoBean.Game";
+
         [Header("Description")]
         [Tooltip("Description of this Game profile for documentation")]
         [SerializeField, TextArea(2, 4)] private string description = "Game mode profile with robust settings for production gameplay.";
@@ -87,6 +103,12 @@ namespace Yokan.PintoBean.Runtime.Unity
         
         public float SamplingRate => samplingRate;
         public string Description => description;
+
+        public AspectRuntimeType AspectRuntimeType => aspectRuntimeType;
+        public bool EnableMetrics => enableMetrics;
+        public bool VerboseLogging => verboseLogging;
+        public string ActivitySourceName => activitySourceName;
+        public string MeterName => meterName;
 
         /// <summary>
         /// Applies this Game profile configuration to SelectionStrategyOptions.
@@ -140,6 +162,43 @@ namespace Yokan.PintoBean.Runtime.Unity
             Debug.Log($"[GameProfileAsset] Applied resilience settings: Timeout={defaultTimeoutSeconds}s, Retries={maxRetryAttempts}, CircuitBreaker={enableCircuitBreaker}");
         }
 
+        /// <summary>
+        /// Applies this Game profile aspect runtime configuration to the service collection.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
+        public void ApplyAspectRuntimeToServices(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
+        {
+            if (services == null)
+            {
+                Debug.LogError($"[GameProfileAsset] Cannot apply aspect runtime settings from {name}: services is null");
+                return;
+            }
+
+            Debug.Log($"[GameProfileAsset] Applying Game aspect runtime settings from {name}: {aspectRuntimeType}");
+
+            switch (aspectRuntimeType)
+            {
+                case AspectRuntimeType.NoOp:
+                    services.AddNoOpAspectRuntime();
+                    break;
+                case AspectRuntimeType.Unity:
+                    services.AddUnityAspectRuntime(enableMetrics, verboseLogging);
+                    break;
+                case AspectRuntimeType.OpenTelemetry:
+                    services.AddOpenTelemetryAspectRuntime(activitySourceName, meterName);
+                    break;
+                case AspectRuntimeType.Adaptive:
+                    services.AddAdaptiveAspectRuntime(activitySourceName, meterName, enableMetrics, verboseLogging);
+                    break;
+                default:
+                    Debug.LogWarning($"[GameProfileAsset] Unknown aspect runtime type: {aspectRuntimeType}, falling back to Unity runtime");
+                    services.AddUnityAspectRuntime(enableMetrics, verboseLogging);
+                    break;
+            }
+
+            Debug.Log($"[GameProfileAsset] Applied aspect runtime: {aspectRuntimeType} (Metrics: {enableMetrics}, Verbose: {verboseLogging})");
+        }
+
         private void Reset()
         {
             // Initialize with Game mode defaults when the asset is created
@@ -162,10 +221,17 @@ namespace Yokan.PintoBean.Runtime.Unity
 
             samplingRate = 0.1f;
 
+            aspectRuntimeType = AspectRuntimeType.Unity;
+            enableMetrics = true;
+            verboseLogging = false;
+            activitySourceName = "PintoBean.Game";
+            meterName = "PintoBean.Game";
+
             description = "Game mode profile with robust settings for production gameplay:\n" +
                          "- Higher timeouts for network operations\n" +
                          "- Multiple retry attempts for resilience\n" +
                          "- Production-ready strategy configurations\n" +
+                         "- Unity aspect runtime for play mode logging\n" +
                          "- Optimized for runtime performance";
         }
     }

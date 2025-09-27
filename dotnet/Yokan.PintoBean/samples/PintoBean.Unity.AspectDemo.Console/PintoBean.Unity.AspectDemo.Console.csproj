@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>PintoBean.Unity.AspectDemo.Console</RootNamespace>
+    <PackageId>GiantCroissant.PintoBean.Unity.AspectDemo.Console</PackageId>
+    <Description>Console demo application for Unity Aspect Runtime</Description>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Yokan.PintoBean.Abstractions\Yokan.PintoBean.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Yokan.PintoBean.Runtime\Yokan.PintoBean.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Yokan.PintoBean.Runtime.Unity\Yokan.PintoBean.Runtime.Unity.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

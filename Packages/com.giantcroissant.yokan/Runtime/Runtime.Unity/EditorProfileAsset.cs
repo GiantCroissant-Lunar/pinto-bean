@@ -63,6 +63,22 @@ namespace Yokan.PintoBean.Runtime.Unity
         [Tooltip("Sampling rate for performance metrics (0.0 - 1.0) - higher for better Editor diagnostics")]
         [SerializeField, Range(0.0f, 1.0f)] private float samplingRate = 1.0f;
 
+        [Header("Aspect Runtime Settings")]
+        [Tooltip("Type of aspect runtime to use for telemetry and logging in Editor mode")]
+        [SerializeField] private AspectRuntimeType aspectRuntimeType = AspectRuntimeType.Adaptive;
+        
+        [Tooltip("Enable metrics recording in aspect runtime")]
+        [SerializeField] private bool enableMetrics = true;
+        
+        [Tooltip("Enable verbose logging in aspect runtime - often useful for Editor development")]
+        [SerializeField] private bool verboseLogging = true;
+        
+        [Tooltip("ActivitySource name for OpenTelemetry tracing (used when AspectRuntimeType is OpenTelemetry or Adaptive)")]
+        [SerializeField] private string activitySourceName = "PintoBean.Editor";
+        
+        [Tooltip("Meter name for OpenTelemetry metrics (used when AspectRuntimeType is OpenTelemetry or Adaptive)")]
+        [SerializeField] private string meterName = "PintoBean.Editor";
+
         [Header("Description")]
         [Tooltip("Description of this Editor profile for documentation")]
         [SerializeField, TextArea(2, 4)] private string description = "Editor mode profile with fast feedback settings for development.";
@@ -87,6 +103,12 @@ namespace Yokan.PintoBean.Runtime.Unity
         
         public float SamplingRate => samplingRate;
         public string Description => description;
+
+        public AspectRuntimeType AspectRuntimeType => aspectRuntimeType;
+        public bool EnableMetrics => enableMetrics;
+        public bool VerboseLogging => verboseLogging;
+        public string ActivitySourceName => activitySourceName;
+        public string MeterName => meterName;
 
         /// <summary>
         /// Applies this Editor profile configuration to SelectionStrategyOptions.
@@ -140,6 +162,43 @@ namespace Yokan.PintoBean.Runtime.Unity
             Debug.Log($"[EditorProfileAsset] Applied resilience settings: Timeout={defaultTimeoutSeconds}s, Retries={maxRetryAttempts}, CircuitBreaker={enableCircuitBreaker}");
         }
 
+        /// <summary>
+        /// Applies this Editor profile aspect runtime configuration to the service collection.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
+        public void ApplyAspectRuntimeToServices(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
+        {
+            if (services == null)
+            {
+                Debug.LogError($"[EditorProfileAsset] Cannot apply aspect runtime settings from {name}: services is null");
+                return;
+            }
+
+            Debug.Log($"[EditorProfileAsset] Applying Editor aspect runtime settings from {name}: {aspectRuntimeType}");
+
+            switch (aspectRuntimeType)
+            {
+                case AspectRuntimeType.NoOp:
+                    services.AddNoOpAspectRuntime();
+                    break;
+                case AspectRuntimeType.Unity:
+                    services.AddUnityAspectRuntime(enableMetrics, verboseLogging);
+                    break;
+                case AspectRuntimeType.OpenTelemetry:
+                    services.AddOpenTelemetryAspectRuntime(activitySourceName, meterName);
+                    break;
+                case AspectRuntimeType.Adaptive:
+                    services.AddAdaptiveAspectRuntime(activitySourceName, meterName, enableMetrics, verboseLogging);
+                    break;
+                default:
+                    Debug.LogWarning($"[EditorProfileAsset] Unknown aspect runtime type: {aspectRuntimeType}, falling back to Adaptive runtime");
+                    services.AddAdaptiveAspectRuntime(activitySourceName, meterName, enableMetrics, verboseLogging);
+                    break;
+            }
+
+            Debug.Log($"[EditorProfileAsset] Applied aspect runtime: {aspectRuntimeType} (Metrics: {enableMetrics}, Verbose: {verboseLogging})");
+        }
+
         private void Reset()
         {
             // Initialize with Editor mode defaults when the asset is created
@@ -162,10 +221,17 @@ namespace Yokan.PintoBean.Runtime.Unity
 
             samplingRate = 1.0f;
 
+            aspectRuntimeType = AspectRuntimeType.Adaptive;
+            enableMetrics = true;
+            verboseLogging = true;
+            activitySourceName = "PintoBean.Editor";
+            meterName = "PintoBean.Editor";
+
             description = "Editor mode profile with fast feedback settings for development:\n" +
                          "- Shorter timeouts for quick failure detection\n" +
                          "- Fewer retry attempts for faster iteration\n" +
                          "- Single provider strategies for predictable testing\n" +
+                         "- Adaptive aspect runtime (OpenTelemetry in Editor, Unity in play mode)\n" +
                          "- Higher sampling rate for better diagnostics";
         }
     }
