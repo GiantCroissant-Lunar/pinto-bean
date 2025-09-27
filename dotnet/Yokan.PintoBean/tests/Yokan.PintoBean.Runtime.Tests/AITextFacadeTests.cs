@@ -1,6 +1,9 @@
 // Tests for AIText façade functionality
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -21,6 +24,9 @@ public class AITextFacadeTests
     public class TestAITextProvider : IAIText
     {
         public int GenerateTextCallCount { get; private set; }
+        public int GenerateTextStreamCallCount { get; private set; }
+        public int ContinueConversationCallCount { get; private set; }
+        public int ContinueConversationStreamCallCount { get; private set; }
         public int CompleteTextCallCount { get; private set; }
         public AITextRequest? LastRequest { get; private set; }
 
@@ -30,9 +36,52 @@ public class AITextFacadeTests
             LastRequest = request;
             return Task.FromResult(new AITextResponse
             {
-                Text = $"Generated: {request.Prompt}",
-                ServiceInfo = "TestAITextProvider"
+                Content = $"Generated: {request.Prompt}",
+                ModelInfo = "TestAITextProvider"
             });
+        }
+
+        public async IAsyncEnumerable<AITextResponse> GenerateTextStreamAsync(AITextRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            GenerateTextStreamCallCount++;
+            LastRequest = request;
+            // Simplified streaming implementation for testing
+            yield return new AITextResponse
+            {
+                Content = $"Streaming: {request.Prompt}",
+                ModelInfo = "TestAITextProvider",
+                IsComplete = false
+            };
+            await Task.Delay(1, cancellationToken); // Simulate async work
+            yield return new AITextResponse
+            {
+                Content = $"Streaming Complete: {request.Prompt}",
+                ModelInfo = "TestAITextProvider",
+                IsComplete = true
+            };
+        }
+
+        public Task<AITextResponse> ContinueConversationAsync(AITextRequest request, CancellationToken cancellationToken = default)
+        {
+            ContinueConversationCallCount++;
+            LastRequest = request;
+            return Task.FromResult(new AITextResponse
+            {
+                Content = $"Conversation: {request.Prompt}",
+                ModelInfo = "TestAITextProvider"
+            });
+        }
+
+        public async IAsyncEnumerable<AITextResponse> ContinueConversationStreamAsync(AITextRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            ContinueConversationStreamCallCount++;
+            LastRequest = request;
+            await Task.Delay(1, cancellationToken); // Simulate async work
+            yield return new AITextResponse
+            {
+                Content = $"Conversation Stream: {request.Prompt}",
+                ModelInfo = "TestAITextProvider"
+            };
         }
 
         public Task<AITextResponse> CompleteTextAsync(AITextRequest request, CancellationToken cancellationToken = default)
@@ -41,8 +90,8 @@ public class AITextFacadeTests
             LastRequest = request;
             return Task.FromResult(new AITextResponse
             {
-                Text = $"Completed: {request.Prompt}",
-                ServiceInfo = "TestAITextProvider"
+                Content = $"Completed: {request.Prompt}",
+                ModelInfo = "TestAITextProvider"
             });
         }
     }
@@ -65,6 +114,41 @@ public class AITextFacadeTests
             // Simulate generated façade pattern: delegate to typed registry
             var typedRegistry = _registry.For<IAIText>();
             return await typedRegistry.InvokeAsync((service, ct) => service.GenerateTextAsync(request, ct), cancellationToken);
+        }
+
+        public async IAsyncEnumerable<AITextResponse> GenerateTextStreamAsync(AITextRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            // Simplified streaming façade for testing - delegate to first available provider
+            var registrations = _registry.GetRegistrations<IAIText>().ToList();
+            if (registrations.Any())
+            {
+                var provider = (IAIText)registrations.First().Provider;
+                await foreach (var response in provider.GenerateTextStreamAsync(request, cancellationToken))
+                {
+                    yield return response;
+                }
+            }
+        }
+
+        public async Task<AITextResponse> ContinueConversationAsync(AITextRequest request, CancellationToken cancellationToken = default)
+        {
+            // Simulate generated façade pattern: delegate to typed registry
+            var typedRegistry = _registry.For<IAIText>();
+            return await typedRegistry.InvokeAsync((service, ct) => service.ContinueConversationAsync(request, ct), cancellationToken);
+        }
+
+        public async IAsyncEnumerable<AITextResponse> ContinueConversationStreamAsync(AITextRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            // Simplified streaming façade for testing - delegate to first available provider
+            var registrations = _registry.GetRegistrations<IAIText>().ToList();
+            if (registrations.Any())
+            {
+                var provider = (IAIText)registrations.First().Provider;
+                await foreach (var response in provider.ContinueConversationStreamAsync(request, cancellationToken))
+                {
+                    yield return response;
+                }
+            }
         }
 
         public async Task<AITextResponse> CompleteTextAsync(AITextRequest request, CancellationToken cancellationToken = default)
@@ -98,8 +182,8 @@ public class AITextFacadeTests
 
         // Assert
         Assert.NotNull(response);
-        Assert.Equal("Generated: Generate a story", response.Text);
-        Assert.Equal("TestAITextProvider", response.ServiceInfo);
+        Assert.Equal("Generated: Generate a story", response.Content);
+        Assert.Equal("TestAITextProvider", response.ModelInfo);
         Assert.Equal(1, testProvider.GenerateTextCallCount);
         Assert.Equal(request, testProvider.LastRequest);
     }
@@ -127,8 +211,8 @@ public class AITextFacadeTests
 
         // Assert
         Assert.NotNull(response);
-        Assert.Equal("Completed: Complete this text", response.Text);
-        Assert.Equal("TestAITextProvider", response.ServiceInfo);
+        Assert.Equal("Completed: Complete this text", response.Content);
+        Assert.Equal("TestAITextProvider", response.ModelInfo);
         Assert.Equal(1, testProvider.CompleteTextCallCount);
         Assert.Equal(request, testProvider.LastRequest);
     }
