@@ -473,11 +473,12 @@ public static class ServiceCollectionExtensions
         if (services == null) throw new ArgumentNullException(nameof(services));
         if (configure == null) throw new ArgumentNullException(nameof(configure));
 
-        // Add base AI registry support
-        services.AddAIRegistry();
-
-        // Configure the registry with provided action
+        // Configure the registry with provided action FIRST
         services.AddServiceRegistry(configure);
+        
+        // Then add selection strategies and PickOne configuration
+        services.AddSelectionStrategies();
+        services.UsePickOneFor<IAIText>();
 
         return services;
     }
