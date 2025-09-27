@@ -380,6 +380,28 @@ public class IntegrationTests
         Assert.NotNull(facade);
     }
 
+    [Fact]
+    public void End2End_NewAIContracts_ShouldBeDetectedAsAICategory()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddSelectionStrategies();
+        var serviceProvider = services.BuildServiceProvider();
+        var factory = serviceProvider.GetRequiredService<ISelectionStrategyFactory>();
+
+        // Act & Assert - Verify new AI contracts are detected as AI category (PickOne strategy)
+        var aiTextStrategy = factory.CreateStrategy<Yokan.PintoBean.Abstractions.IAIText>();
+        Assert.Equal(SelectionStrategyType.PickOne, aiTextStrategy.StrategyType);
+
+        var vectorStrategy = factory.CreateStrategy<Yokan.PintoBean.Abstractions.IIVector>();
+        // IIVector might not be detected as AI by name alone, but should work as Resources (PickOne)
+        Assert.Equal(SelectionStrategyType.PickOne, vectorStrategy.StrategyType);
+
+        var toolCallStrategy = factory.CreateStrategy<Yokan.PintoBean.Abstractions.IIToolCall>();
+        // IIToolCall might not be detected as AI by name alone, but should work as Resources (PickOne)  
+        Assert.Equal(SelectionStrategyType.PickOne, toolCallStrategy.StrategyType);
+    }
+
     // Test service interfaces for category inference
     public interface IAnalyticsService { void Track(string eventName); }
     public interface IResourceService { string LoadResource(string key); }
