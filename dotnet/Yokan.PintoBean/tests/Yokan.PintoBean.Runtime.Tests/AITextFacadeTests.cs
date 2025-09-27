@@ -218,6 +218,73 @@ public class AITextFacadeTests
     }
 
     [Fact]
+    public async Task AITextFacade_GenerateTextStreamAsync_ShouldRouteViaRegistry()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddAIRegistry();
+        services.AddNoOpAspectRuntime();
+        services.AddResilienceExecutor();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var registry = serviceProvider.GetRequiredService<IServiceRegistry>();
+        
+        var testProvider = new TestAITextProvider();
+        registry.Register<IAIText>(testProvider, ProviderCapabilities.Create("test-provider"));
+
+        var facade = new TestAITextFacade(registry);
+        var request = new AITextRequest { Prompt = "Stream this text" };
+
+        // Act
+        var responses = new List<AITextResponse>();
+        await foreach (var response in facade.GenerateTextStreamAsync(request))
+        {
+            responses.Add(response);
+        }
+
+        // Assert
+        Assert.Equal(2, responses.Count);
+        Assert.Equal("Streaming: Stream this text", responses[0].Content);
+        Assert.Equal("Streaming Complete: Stream this text", responses[1].Content);
+        Assert.False(responses[0].IsComplete);
+        Assert.True(responses[1].IsComplete);
+        Assert.Equal(1, testProvider.GenerateTextStreamCallCount);
+        Assert.Equal(request, testProvider.LastRequest);
+    }
+
+    [Fact]
+    public async Task AITextFacade_ContinueConversationStreamAsync_ShouldRouteViaRegistry()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddAIRegistry();
+        services.AddNoOpAspectRuntime();
+        services.AddResilienceExecutor();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var registry = serviceProvider.GetRequiredService<IServiceRegistry>();
+        
+        var testProvider = new TestAITextProvider();
+        registry.Register<IAIText>(testProvider, ProviderCapabilities.Create("test-provider"));
+
+        var facade = new TestAITextFacade(registry);
+        var request = new AITextRequest { Prompt = "Continue conversation" };
+
+        // Act
+        var responses = new List<AITextResponse>();
+        await foreach (var response in facade.ContinueConversationStreamAsync(request))
+        {
+            responses.Add(response);
+        }
+
+        // Assert
+        Assert.Single(responses);
+        Assert.Equal("Conversation Stream: Continue conversation", responses[0].Content);
+        Assert.Equal(1, testProvider.ContinueConversationStreamCallCount);
+        Assert.Equal(request, testProvider.LastRequest);
+    }
+
+    [Fact]
     public void AITextFacade_WithCapabilityTags_ShouldSupportModelFamilyAndContextWindow()
     {
         // Arrange

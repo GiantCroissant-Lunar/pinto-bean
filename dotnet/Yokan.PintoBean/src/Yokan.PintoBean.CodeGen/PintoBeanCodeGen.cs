@@ -112,6 +112,8 @@ public class PintoBeanCodeGen : IIncrementalGenerator
 
         // Usings
         sb.AppendLine("using System;");
+        sb.AppendLine("using System.Collections.Generic;");
+        sb.AppendLine("using System.Runtime.CompilerServices;");
         sb.AppendLine("using System.Threading;");
         sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using Yokan.PintoBean.Runtime;");
@@ -175,20 +177,35 @@ public class PintoBeanCodeGen : IIncrementalGenerator
         var methodName = method.Name;
         var returnType = method.ReturnType.ToDisplayString();
 
+        // Determine method type (async, streaming, or sync)
+        bool isAsync = method.ReturnType.Name == "Task" ||
+                      (method.ReturnType is INamedTypeSymbol namedType &&
+                       namedType.IsGenericType && namedType.ConstructedFrom.Name == "Task");
+        
+        bool isStreaming = method.ReturnType is INamedTypeSymbol streamingType &&
+                          streamingType.IsGenericType && 
+                          streamingType.ConstructedFrom.Name == "IAsyncEnumerable";
+
         // Build parameter lists
         var parameters = method.Parameters.Select(p =>
-            $"{p.Type.ToDisplayString()} {p.Name}").ToArray();
+        {
+            var paramType = p.Type.ToDisplayString();
+            var paramName = p.Name;
+            
+            // Add [EnumeratorCancellation] attribute for CancellationToken parameters in streaming methods
+            if (isStreaming && p.Type.Name == "CancellationToken")
+            {
+                return $"[EnumeratorCancellation] {paramType} {paramName}";
+            }
+            
+            return $"{paramType} {paramName}";
+        }).ToArray();
         var parameterList = string.Join(", ", parameters);
 
         var argumentList = string.Join(", ", method.Parameters.Select(p => p.Name));
 
-        // Determine if method is async
-        bool isAsync = method.ReturnType.Name == "Task" ||
-                      (method.ReturnType is INamedTypeSymbol namedType &&
-                       namedType.IsGenericType && namedType.ConstructedFrom.Name == "Task");
-
-        // Method signature - add async keyword if needed
-        var asyncModifier = isAsync ? "async " : "";
+        // Method signature - add async keyword for streaming and non-streaming async methods
+        var asyncModifier = (isAsync || isStreaming) ? "async " : "";
         sb.AppendLine($"    public {asyncModifier}{returnType} {methodName}({parameterList})");
         sb.AppendLine("    {");
 
@@ -196,22 +213,37 @@ public class PintoBeanCodeGen : IIncrementalGenerator
         var operationName = $"{contractTypeName}.{methodName}";
         sb.AppendLine($"        using var op = _aspectRuntime.StartOperation(\"{operationName}\");");
 
-        if (isAsync)
+        if (isStreaming)
+        {
+            // IAsyncEnumerable streaming method implementation
+            var cancellationTokenParam = method.Parameters.FirstOrDefault(p => p.Type.Name == "CancellationToken");
+            var cancellationTokenArg = cancellationTokenParam != null ? cancellationTokenParam.Name : "CancellationToken.None";
+            
+            sb.AppendLine($"        var typedRegistry = _registry.For<{contractTypeName}>();");
+            sb.AppendLine($"        await foreach (var result in typedRegistry.InvokeStreamAsync((service, ct) => service.{methodName}({argumentList}), {cancellationTokenArg}))");
+            sb.AppendLine("        {");
+            sb.AppendLine("            yield return result;");
+            sb.AppendLine("        }");
+        }
+        else if (isAsync)
         {
             // Async method implementation
+            var cancellationTokenParam = method.Parameters.FirstOrDefault(p => p.Type.Name == "CancellationToken");
+            var cancellationTokenArg = cancellationTokenParam != null ? cancellationTokenParam.Name : "CancellationToken.None";
+            
             if (method.ReturnType.Name == "Task" && method.ReturnType is INamedTypeSymbol taskType && !taskType.IsGenericType)
             {
                 // Task (no return value)
                 sb.AppendLine($"        await _resilienceExecutor.ExecuteAsync(async ct => ");
                 sb.AppendLine($"            await _registry.For<{contractTypeName}>().InvokeAsync(async (service, ct) => ");
-                sb.AppendLine($"                await service.{methodName}({argumentList}), ct), CancellationToken.None);");
+                sb.AppendLine($"                await service.{methodName}({argumentList}), ct), {cancellationTokenArg});");
             }
             else
             {
                 // Task<T>
                 sb.AppendLine($"        var result = await _resilienceExecutor.ExecuteAsync(async ct => ");
                 sb.AppendLine($"            await _registry.For<{contractTypeName}>().InvokeAsync(async (service, ct) => ");
-                sb.AppendLine($"                await service.{methodName}({argumentList}), ct), CancellationToken.None);");
+                sb.AppendLine($"                await service.{methodName}({argumentList}), ct), {cancellationTokenArg});");
                 sb.AppendLine("        return result;");
             }
         }

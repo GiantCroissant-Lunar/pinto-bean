@@ -144,6 +144,15 @@ public interface IServiceRegistry<TService>
     Task InvokeAsync(Func<TService, CancellationToken, Task> func, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Invokes a streaming function on the selected provider using the default strategy.
+    /// </summary>
+    /// <typeparam name="TResult">The type of items yielded by the stream.</typeparam>
+    /// <param name="func">The streaming function to invoke on the provider.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>An async enumerable of results from the selected provider.</returns>
+    IAsyncEnumerable<TResult> InvokeStreamAsync<TResult>(Func<TService, CancellationToken, IAsyncEnumerable<TResult>> func, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Checks if any providers are registered for this service contract.
     /// </summary>
     /// <returns>True if providers are registered, false otherwise.</returns>
