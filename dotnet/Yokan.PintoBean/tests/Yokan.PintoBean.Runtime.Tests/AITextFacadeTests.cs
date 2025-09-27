@@ -285,6 +285,130 @@ public class AITextFacadeTests
     }
 
     [Fact]
+    public async Task AITextFacade_GenerateTextStreamAsync_WithCancellation_ShouldCancelGracefully()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddAIRegistry();
+        services.AddNoOpAspectRuntime();
+        services.AddResilienceExecutor();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var registry = serviceProvider.GetRequiredService<IServiceRegistry>();
+        
+        // Create a provider with slower streaming to test cancellation
+        var testProvider = new SlowStreamingTestProvider();
+        registry.Register<IAIText>(testProvider, ProviderCapabilities.Create("slow-provider"));
+
+        var facade = new TestAITextFacade(registry);
+        var request = new AITextRequest { Prompt = "Start streaming" };
+
+        using var cts = new CancellationTokenSource();
+        
+        // Act - Start streaming and cancel after short delay
+        var streamingTask = Task.Run(async () =>
+        {
+            var responses = new List<AITextResponse>();
+            try
+            {
+                await foreach (var response in facade.GenerateTextStreamAsync(request, cts.Token))
+                {
+                    responses.Add(response);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when cancelled
+            }
+            return responses;
+        });
+
+        // Cancel after 50ms (should interrupt the streaming)
+        await Task.Delay(50);
+        cts.Cancel();
+        
+        var results = await streamingTask;
+
+        // Assert - Should have received some responses but not all
+        Assert.True(results.Count > 0, "Should have received at least one response before cancellation");
+        Assert.True(results.Count < 5, "Should not have received all responses due to cancellation");
+        Assert.True(testProvider.WasCancelled, "Provider should have detected cancellation");
+    }
+
+    /// <summary>
+    /// Test provider that streams slowly to allow cancellation testing
+    /// </summary>
+    public class SlowStreamingTestProvider : IAIText
+    {
+        public bool WasCancelled { get; private set; }
+
+        public Task<AITextResponse> GenerateTextAsync(AITextRequest request, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new AITextResponse
+            {
+                Content = $"Generated: {request.Prompt}",
+                ModelInfo = "SlowStreamingTestProvider"
+            });
+        }
+
+        public async IAsyncEnumerable<AITextResponse> GenerateTextStreamAsync(AITextRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                // Check for cancellation first
+                cancellationToken.ThrowIfCancellationRequested();
+
+                yield return new AITextResponse
+                {
+                    Content = $"Token {i}",
+                    ModelInfo = "SlowStreamingTestProvider",
+                    IsComplete = i == 4
+                };
+
+                // Delay between tokens to allow cancellation
+                try
+                {
+                    await Task.Delay(100, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    WasCancelled = true;
+                    throw;
+                }
+            }
+        }
+
+        public Task<AITextResponse> ContinueConversationAsync(AITextRequest request, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new AITextResponse
+            {
+                Content = $"Conversation: {request.Prompt}",
+                ModelInfo = "SlowStreamingTestProvider"
+            });
+        }
+
+        public async IAsyncEnumerable<AITextResponse> ContinueConversationStreamAsync(AITextRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            yield return new AITextResponse
+            {
+                Content = $"Conversation Stream: {request.Prompt}",
+                ModelInfo = "SlowStreamingTestProvider"
+            };
+            
+            await Task.CompletedTask; // Make the compiler happy about async
+        }
+
+        public Task<AITextResponse> CompleteTextAsync(AITextRequest request, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new AITextResponse
+            {
+                Content = $"Completed: {request.Prompt}",
+                ModelInfo = "SlowStreamingTestProvider"
+            });
+        }
+    }
+
+    [Fact]
     public void AITextFacade_WithCapabilityTags_ShouldSupportModelFamilyAndContextWindow()
     {
         // Arrange
