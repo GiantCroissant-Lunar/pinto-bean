@@ -118,6 +118,92 @@ public class ServiceBootstrap : MonoBehaviour
 }
 ```
 
+## Unity Logging & Telemetry
+
+PintoBean provides Unity-specific aspect runtime implementations for logging and telemetry collection:
+
+### Unity Aspect Runtime
+
+The `UnityAspectRuntime` logs service calls to Unity's Debug console with minimal overhead:
+
+```csharp
+// Manual configuration
+services.AddUnityAspectRuntime(enableMetrics: true, verboseLogging: false);
+
+// Output in Unity Console:
+// [PintoBean] ✓ IHelloService.SayHelloAsync completed in 45.20ms → String
+// [PintoBean] 📊 user.actions: 1.00 [category=gameplay, level=tutorial]
+```
+
+### Profile-Based Configuration
+
+Use Unity ScriptableObject profiles to configure aspect runtime per mode:
+
+#### Game Profile (Play Mode)
+```csharp
+// Create via: Assets > Create > PintoBean > Game Profile
+// Default: Unity aspect runtime for production logging
+```
+
+#### Editor Profile (Editor Mode)  
+```csharp
+// Create via: Assets > Create > PintoBean > Editor Profile
+// Default: Adaptive runtime (OpenTelemetry in Editor, Unity in builds)
+```
+
+#### Applying Profile Configuration
+```csharp
+public class ServiceBootstrap : MonoBehaviour
+{
+    [SerializeField] private GameProfileAsset gameProfile;
+    [SerializeField] private EditorProfileAsset editorProfile;
+    
+    void Awake()
+    {
+        var services = new ServiceCollection();
+        
+        // Apply aspect runtime based on profile
+        var profile = Application.isEditor && !Application.isPlaying 
+            ? editorProfile : gameProfile;
+            
+        if (profile != null)
+        {
+            profile.ApplyAspectRuntimeToServices(services);
+        }
+        else
+        {
+            // Fallback to Unity runtime
+            services.AddUnityAspectRuntime();
+        }
+        
+        // ... rest of service configuration
+    }
+}
+```
+
+### Aspect Runtime Types
+
+- **NoOp**: No telemetry collection (minimal overhead)
+- **Unity**: Unity Debug.* logging with low-cardinality tags  
+- **OpenTelemetry**: Full OpenTelemetry tracing and metrics
+- **Adaptive**: Auto-switches between Unity and OpenTelemetry based on environment
+
+### Usage Examples
+
+```csharp
+// The aspect runtime automatically captures service calls when using the service registry:
+var helloRegistry = serviceProvider.GetRequiredService<IServiceRegistry<IHelloService>>();
+
+// This call will be logged by the configured aspect runtime
+helloRegistry.Invoke(service => service.SayHelloAsync("World"));
+
+// Manual aspect runtime usage (for custom operations)
+var aspectRuntime = serviceProvider.GetRequiredService<IAspectRuntime>();
+using var operation = aspectRuntime.StartOperation("custom-work");
+// ... do work ...
+aspectRuntime.RecordMetric("work.completed", 1.0, ("type", "background"));
+```
+
 ## Requirements
 
 - Unity 2022.3 or newer (for assembly definition support)
