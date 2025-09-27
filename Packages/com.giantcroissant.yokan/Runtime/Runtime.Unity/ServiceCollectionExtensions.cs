@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Yokan.PintoBean.Runtime;
 
 namespace Yokan.PintoBean.Runtime.Unity;
 
@@ -48,6 +49,59 @@ public static class ServiceCollectionExtensions
 
         // Add Unity bridge marker service
         services.TryAddSingleton<IUnityBridgeMarker, UnityBridgeMarker>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds Unity scheduler support to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="mainThreadId">The ID of the Unity main thread. If not provided, uses the current thread.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when services is null.</exception>
+    public static IServiceCollection AddUnityScheduler(this IServiceCollection services, int? mainThreadId = null)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+
+        // Register the Unity scheduler
+        services.TryAddSingleton<IUnityScheduler>(serviceProvider => new DefaultUnityScheduler(mainThreadId));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds Unity scheduler support to the service collection with a custom implementation.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="scheduler">The scheduler instance to register.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when services or scheduler is null.</exception>
+    public static IServiceCollection AddUnityScheduler(this IServiceCollection services, IUnityScheduler scheduler)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (scheduler == null) throw new ArgumentNullException(nameof(scheduler));
+
+        // Register the provided scheduler instance
+        services.TryAddSingleton(scheduler);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds Unity scheduler support to the service collection with a factory delegate.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="schedulerFactory">Factory delegate for creating the scheduler.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when services or schedulerFactory is null.</exception>
+    public static IServiceCollection AddUnityScheduler(this IServiceCollection services, Func<IServiceProvider, IUnityScheduler> schedulerFactory)
+    {
+        if (services == null) throw new ArgumentNullException(nameof(services));
+        if (schedulerFactory == null) throw new ArgumentNullException(nameof(schedulerFactory));
+
+        // Register the scheduler using the provided factory
+        services.TryAddSingleton(schedulerFactory);
 
         return services;
     }

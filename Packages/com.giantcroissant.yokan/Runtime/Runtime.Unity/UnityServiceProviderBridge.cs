@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Yokan.PintoBean.Runtime.Unity;
@@ -21,6 +22,11 @@ public sealed class UnityServiceProviderBridge
     /// Gets a value indicating whether the bridge has been initialized.
     /// </summary>
     public static bool IsInitialized => _instance != null;
+
+    /// <summary>
+    /// Gets the Unity scheduler if available in the service provider.
+    /// </summary>
+    public IUnityScheduler? Scheduler => _serviceProvider.GetService<IUnityScheduler>();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UnityServiceProviderBridge"/> class.
@@ -111,5 +117,42 @@ public sealed class UnityServiceProviderBridge
     public object GetRequiredService(Type serviceType)
     {
         return _serviceProvider.GetRequiredService(serviceType);
+    }
+
+    /// <summary>
+    /// Posts an action to run on the Unity main thread if a scheduler is available.
+    /// If no scheduler is available, executes the action immediately.
+    /// </summary>
+    /// <param name="action">The action to execute.</param>
+    public void PostToMainThread(Action action)
+    {
+        var scheduler = Scheduler;
+        if (scheduler != null)
+        {
+            scheduler.Post(action);
+        }
+        else
+        {
+            action();
+        }
+    }
+
+    /// <summary>
+    /// Posts an async function to run on the Unity main thread if a scheduler is available.
+    /// If no scheduler is available, executes the function immediately.
+    /// </summary>
+    /// <param name="func">The async function to execute.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public Task PostToMainThreadAsync(Func<Task> func)
+    {
+        var scheduler = Scheduler;
+        if (scheduler != null)
+        {
+            return scheduler.PostAsync(func);
+        }
+        else
+        {
+            return func();
+        }
     }
 }
