@@ -15,4 +15,8 @@
     <PackageReference Include="System.IO.Pipelines" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ConsoleGame.Terminal.Transport\ConsoleGame.Terminal.Transport.csproj" />
+  </ItemGroup>
+
 </Project>

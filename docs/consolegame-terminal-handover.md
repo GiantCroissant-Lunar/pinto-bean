@@ -41,6 +41,49 @@ dotnet run --project ConsoleGame.TerminalHost
 
 * Default port: `4040`. Change via `CONSOLE_GAME_WS_PORT` if port conflicts occur.
 * Each new browser session spawns its own child process; monitor resource usage if multiple sessions connect.
+* Named pipe transport is exposed via `CONSOLE_GAME_PIPE_NAME` (defaults to `console-game-terminal`). Local clients can attach without interfering with browser sessions.
+
+### Local CLI client
+
+```powershell
+# With the host already running
+cd dotnet/ConsoleGame
+$env:CONSOLE_GAME_PIPE_NAME = "console-game-terminal" # optional override
+
+dotnet run --project src/ConsoleGame.Terminal.Client.Cli
+```
+
+* Streams STDOUT/STDERR/control frames in the console.
+* Any input you type (press Enter to send) is forwarded to the shared session.
+
+### Terminal.Gui TUI client
+
+```powershell
+# In a new terminal while the host is running
+cd dotnet/ConsoleGame
+$env:CONSOLE_GAME_PIPE_NAME = "console-game-terminal" # optional override
+
+dotnet run --project src/ConsoleGame.Terminal.Client.Tui
+```
+
+* Presents an `Application.Init` window that mirrors the same output the browser sees.
+* Type into the bottom input field or use `_Send`; keystrokes are sent over the named pipe to the shared process.
+
+### End-to-end validation
+
+1. Start the host (`ConsoleGame.TerminalHost`) as above.
+2. Launch the CLI and/or TUI clients to verify local control works.
+3. Open the browser front-end (`scripts/nodejs/apps/main-site`, run `pnpm --filter main-site dev`, navigate to `/terminal`).
+4. Confirm all clients see the same output and can issue commands concurrently.
+
+### Automated transport tests
+
+```powershell
+cd dotnet/ConsoleGame
+dotnet test tests/ConsoleGame.Terminal.Transport.Tests/ConsoleGame.Terminal.Transport.Tests.csproj
+```
+
+* Covers frame codec round-trips and multiplexer broadcast/STDIN forwarding.
 
 ## Frontend Touchpoints
 

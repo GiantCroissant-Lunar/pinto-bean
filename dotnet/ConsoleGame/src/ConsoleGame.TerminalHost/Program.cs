@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using ConsoleGame.Terminal.Transport;
+using ConsoleGame.Terminal.Transport.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SuperSocket;
@@ -21,10 +23,16 @@ namespace ConsoleGame.TerminalHost;
 
 public static class Program
 {
-    private static readonly ConcurrentDictionary<string, ProcessEntry> ProcessRegistry = new();
+    private static readonly ConcurrentDictionary<string, TerminalClientHandle> ClientRegistry = new();
+    private static TerminalProcessHost? _processHost;
+    private static NamedPipeTerminalServer? _pipeServer;
 
     public static async Task Main(string[] args)
     {
+        var logsDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+        Directory.CreateDirectory(logsDirectory);
+        var logFilePath = Path.Combine(logsDirectory, $"host-{DateTimeOffset.UtcNow:yyyyMMdd}.log");
+
         var host = WebSocketHostBuilder.Create(args)
             .UseWebSocketMessageHandler(HandleMessageAsync)
             .UseSessionHandler(OnSessionConnectedAsync, OnSessionClosedAsync)
@@ -42,22 +50,107 @@ public static class Program
             })
             .ConfigureLogging((_, logging) =>
             {
+                logging.ClearProviders();
+                logging.SetMinimumLevel(LogLevel.Debug);
                 logging.AddConsole();
+                logging.AddProvider(new FileLoggerProvider(logFilePath));
             })
-            // .UseInMemorySessionContainer()
             .Build();
 
-        await host.RunAsync();
+        TerminalExecutable executable;
+        try
+        {
+            executable = TerminalProcessLocator.ResolveExecutablePath();
+        }
+        catch (Exception ex)
+        {
+            var startupFactory = LoggerFactory.Create(builder =>
+            {
+                builder.SetMinimumLevel(LogLevel.Debug);
+                builder.AddConsole();
+                builder.AddProvider(new FileLoggerProvider(logFilePath));
+            });
+            var startupLogger = startupFactory.CreateLogger("TerminalStartup");
+            startupLogger.LogCritical(ex, "Failed to resolve ConsoleGame executable");
+            Console.Error.WriteLine($"[TerminalHost] Failed to resolve ConsoleGame executable: {ex.Message}");
+            Console.Error.WriteLine(ex);
+            startupFactory.Dispose();
+            return;
+        }
+
+        var serviceProvider = host.Services;
+        var existingLoggerFactory = serviceProvider?.GetService<ILoggerFactory>();
+        var ownsLoggerFactory = existingLoggerFactory is null;
+        var loggerFactory = existingLoggerFactory ?? LoggerFactory.Create(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Debug);
+            builder.AddConsole();
+            builder.AddProvider(new FileLoggerProvider(logFilePath));
+        });
+        var hostLogger = loggerFactory.CreateLogger("TerminalHost");
+
+        hostLogger.LogInformation("ConsoleGame Terminal Host starting. Executable: {Executable} {Arguments}", executable.FileName, executable.Arguments);
+
+        try
+        {
+            var processOptions = new TerminalProcessOptions
+            {
+                FileName = executable.FileName,
+                Arguments = executable.Arguments,
+                WorkingDirectory = executable.WorkingDirectory
+            };
+            processOptions.EnvironmentVariables["CONSOLEGAME_TUI_HEADLESS"] = "1";
+
+            _processHost = TerminalProcessHost.Start(processOptions, loggerFactory);
+            hostLogger.LogInformation("ConsoleGame process started with PID {Pid}", _processHost.ProcessId);
+
+            var pipeName = ResolvePipeName();
+            _pipeServer = new NamedPipeTerminalServer(pipeName, _processHost.Session, loggerFactory.CreateLogger<NamedPipeTerminalServer>());
+            _pipeServer.Start();
+            hostLogger.LogInformation("Named pipe server started on {PipeName}", pipeName);
+
+            await host.RunAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            hostLogger.LogCritical(ex, "Unhandled exception in ConsoleGame Terminal Host");
+            Console.Error.WriteLine($"[TerminalHost] Unhandled exception: {ex.Message}");
+            Console.Error.WriteLine(ex);
+            throw;
+        }
+        finally
+        {
+            if (_pipeServer is not null)
+            {
+                await _pipeServer.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (_processHost is not null)
+            {
+                await _processHost.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (ownsLoggerFactory && loggerFactory is IDisposable disposableFactory)
+            {
+                disposableFactory.Dispose();
+            }
+        }
     }
 
     private static async ValueTask HandleMessageAsync(WebSocketSession session, WebSocketPackage package)
     {
-        if (!ProcessRegistry.TryGetValue(session.SessionID, out var entry))
+        if (!ClientRegistry.TryGetValue(session.SessionID, out var handle))
         {
             return;
         }
 
-        await entry.ForwardInputAsync(package.Message, session);
+        if (string.IsNullOrEmpty(package.Message))
+        {
+            return;
+        }
+
+        var payload = Encoding.UTF8.GetBytes(package.Message);
+        await handle.ForwardInputAsync(payload).ConfigureAwait(false);
     }
 
     private static async ValueTask OnSessionConnectedAsync(IAppSession session)
@@ -68,101 +161,71 @@ public static class Program
             return;
         }
 
-        LogInformation(wsSession, "Session {SessionID} connected", session.SessionID);
-
-        var entry = await CreateProcessEntryAsync(wsSession);
-        if (entry is null)
+        if (_processHost is null)
         {
+            await wsSession.SendAsync("Terminal host unavailable.\n");
+            await wsSession.CloseAsync(CloseReason.InternalError);
             return;
         }
 
-        if (!ProcessRegistry.TryAdd(session.SessionID, entry))
+        LogInformation(wsSession, "Session {SessionID} connected", session.SessionID);
+
+        TerminalClientHandle handle;
+        try
+        {
+            handle = _processHost.Session.RegisterClient($"ws:{session.SessionID}", async (frame, ct) =>
+            {
+                if (frame.Payload.Length == 0)
+                {
+                    return;
+                }
+
+                try
+                {
+                    await wsSession.SendAsync(frame.Payload).ConfigureAwait(false);
+                }
+                catch
+                {
+                    throw;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            LogError(wsSession, ex, "Failed to register WebSocket client {SessionID}", session.SessionID);
+            await wsSession.SendAsync("Internal error registering client.\n");
+            await wsSession.CloseAsync(CloseReason.InternalError);
+            return;
+        }
+
+        if (!ClientRegistry.TryAdd(session.SessionID, handle))
         {
             await wsSession.SendAsync("Internal error: session registry conflict.\n");
             await wsSession.CloseAsync(CloseReason.InternalError);
-            await entry.DisposeAsync();
+            await handle.DisposeAsync().ConfigureAwait(false);
             return;
         }
 
-        entry.StartPumps(wsSession);
+        await wsSession.SendAsync($"[connected] pipe={ResolvePipeName()}\n");
     }
 
     private static async ValueTask OnSessionClosedAsync(
         IAppSession session,
         CloseEventArgs e)
     {
-        if (!ProcessRegistry.TryRemove(session.SessionID, out var entry))
-        {
-            return;
-        }
-
-        entry.Cancellation.Cancel();
-
-        if (!entry.Process.HasExited)
+        if (ClientRegistry.TryRemove(session.SessionID, out var handle))
         {
             try
             {
-                entry.Process.Kill(true);
+                await handle.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                LogWarning(session, ex, "Failed to terminate ConsoleGame process for session {SessionID}", session.SessionID);
+                LogWarning(session, ex, "Error disposing client handle for session {SessionID}", session.SessionID);
             }
         }
-
-        await entry.DisposeAsync();
 
         LogInformation(session, "Session {SessionID} closed ({Reason})", session.SessionID, e.Reason);
-    }
-
-    private static async Task<ProcessEntry?> CreateProcessEntryAsync(WebSocketSession session)
-    {
-        var executable = TerminalProcessLocator.ResolveExecutablePath();
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = executable.FileName,
-            Arguments = executable.Arguments,
-            WorkingDirectory = executable.WorkingDirectory,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-
-        try
-        {
-            process.Start();
-        }
-        catch (Exception ex)
-        {
-            LogError(session, ex, "Failed to launch ConsoleGame process");
-            await session.SendAsync($"Failed to launch ConsoleGame: {ex.Message}\n");
-            await session.CloseAsync(CloseReason.InternalError);
-            process.Dispose();
-            return null;
-        }
-
-        var entry = new ProcessEntry(process, process.StandardInput, new CancellationTokenSource());
-
-        process.Exited += async (_, _) =>
-        {
-            LogInformation(session, "ConsoleGame process exited for session {SessionID}", session.SessionID);
-
-            try
-            {
-                await session.SendAsync("\n[Process terminated]\n");
-                await session.CloseAsync();
-            }
-            catch
-            {
-                // ignore errors triggered during shutdown
-            }
-        };
-
-        return entry;
     }
 
     private static int ResolvePort()
@@ -171,53 +234,10 @@ public static class Program
         return int.TryParse(portValue, out var port) ? port : 4040;
     }
 
-    private static async Task PumpOutputAsync(WebSocketSession session, StreamReader reader, CancellationToken token, string streamName)
+    private static string ResolvePipeName()
     {
-        var buffer = new char[1024];
-
-        try
-        {
-            while (!token.IsCancellationRequested)
-            {
-                var read = await reader.ReadAsync(buffer.AsMemory(0, buffer.Length)).ConfigureAwait(false);
-                if (read <= 0)
-                {
-                    break;
-                }
-
-                var text = new string(buffer, 0, read);
-                await session.SendAsync(Encoding.UTF8.GetBytes(text)).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // expected during shutdown
-        }
-        catch (Exception ex)
-        {
-            LogError(session, ex, "{Stream} pumping failed for session {SessionID}", streamName, session.SessionID);
-        }
-    }
-
-    private static async Task SafeAwaitAsync(Task? task)
-    {
-        if (task is null)
-        {
-            return;
-        }
-
-        try
-        {
-            await task.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // ignore cancellation during shutdown
-        }
-        catch (Exception)
-        {
-            // ignore other errors when disposing
-        }
+        var pipeValue = Environment.GetEnvironmentVariable("CONSOLE_GAME_PIPE_NAME");
+        return string.IsNullOrWhiteSpace(pipeValue) ? "console-game-terminal" : pipeValue;
     }
 
     private static void LogInformation(IAppSession session, string message, params object[] args)
@@ -244,71 +264,6 @@ public static class Program
         }
     }
 
-    private sealed class ProcessEntry : IAsyncDisposable, IDisposable
-    {
-        private readonly SemaphoreSlim _writeLock = new(1, 1);
-
-        public ProcessEntry(Process process, StreamWriter stdin, CancellationTokenSource cancellation)
-        {
-            Process = process;
-            Stdin = stdin;
-            Cancellation = cancellation;
-        }
-
-        public Process Process { get; }
-        public StreamWriter Stdin { get; }
-        public CancellationTokenSource Cancellation { get; }
-        public Task? StdoutPump { get; private set; }
-        public Task? StderrPump { get; private set; }
-
-        public void StartPumps(WebSocketSession session)
-        {
-            StdoutPump = PumpOutputAsync(session, Process.StandardOutput, Cancellation.Token, "stdout");
-            StderrPump = PumpOutputAsync(session, Process.StandardError, Cancellation.Token, "stderr");
-        }
-
-        public async Task ForwardInputAsync(string message, WebSocketSession session)
-        {
-            try
-            {
-                await _writeLock.WaitAsync(Cancellation.Token).ConfigureAwait(false);
-                await Stdin.WriteAsync(message).ConfigureAwait(false);
-                await Stdin.FlushAsync().ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // expected during shutdown
-            }
-            catch (Exception ex)
-            {
-                LogError(session, ex, "Failed to forward input to ConsoleGame for session {SessionID}", session.SessionID);
-                await session.SendAsync($"Input error: {ex.Message}\n").ConfigureAwait(false);
-            }
-            finally
-            {
-                _writeLock.Release();
-            }
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            Stdin.Dispose();
-            Cancellation.Dispose();
-            Process.Dispose();
-            _writeLock.Dispose();
-
-            await SafeAwaitAsync(StdoutPump).ConfigureAwait(false);
-            await SafeAwaitAsync(StderrPump).ConfigureAwait(false);
-        }
-
-        public void Dispose()
-        {
-            Stdin.Dispose();
-            Cancellation.Dispose();
-            Process.Dispose();
-            _writeLock.Dispose();
-        }
-    }
     private static class TerminalProcessLocator
     {
         private const string ExecutableEnv = "CONSOLE_GAME_EXE";
@@ -340,21 +295,54 @@ public static class Program
 
         private static TerminalExecutable? ProbeDefaultExecutable()
         {
-            var relativePath = Path.Combine("src", "ConsoleGame.App", "bin", "Debug", "net8.0");
-            var baseDirectory = AppContext.BaseDirectory;
-            var probePaths = new[]
+            var candidateFileNames = new[] { "ConsoleGame.App.exe", "ConsoleGame.App" };
+            var configurations = new[] { "Debug", "Release" };
+            var frameworks = new[] { "net8.0" };
+            var searchRoots = new[]
             {
-                Path.Combine(baseDirectory, relativePath, "ConsoleGame.App.exe"),
-                Path.Combine(baseDirectory, relativePath, "ConsoleGame.App"),
-                Path.Combine(Directory.GetCurrentDirectory(), relativePath, "ConsoleGame.App.exe"),
-                Path.Combine(Directory.GetCurrentDirectory(), relativePath, "ConsoleGame.App")
-            };
+                AppContext.BaseDirectory,
+                Directory.GetCurrentDirectory(),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..")),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."))
+            }
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(root => new DirectoryInfo(root))
+            .Where(dir => dir.Exists)
+            .ToArray();
 
-            foreach (var path in probePaths)
+            foreach (var root in searchRoots)
             {
-                if (File.Exists(path))
+                for (var current = root; current is not null; current = current.Parent)
                 {
-                    return new TerminalExecutable(path, ResolveArguments(), Path.GetDirectoryName(path)!);
+                    foreach (var configuration in configurations)
+                    {
+                        foreach (var framework in frameworks)
+                        {
+                            foreach (var relative in new[]
+                            {
+                                Path.Combine("ConsoleGame.App", "bin", configuration, framework),
+                                Path.Combine("src", "ConsoleGame.App", "bin", configuration, framework)
+                            })
+                            {
+                                var candidateDirectory = Path.Combine(current.FullName, relative);
+                                if (!Directory.Exists(candidateDirectory))
+                                {
+                                    continue;
+                                }
+
+                                foreach (var fileName in candidateFileNames)
+                                {
+                                    var fullPath = Path.Combine(candidateDirectory, fileName);
+                                    if (!File.Exists(fullPath))
+                                    {
+                                        continue;
+                                    }
+
+                                    return new TerminalExecutable(fullPath, ResolveArguments(), candidateDirectory);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
