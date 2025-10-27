@@ -1,0 +1,22 @@
+{
+  "id": "ollama-text-v1",
+  "version": "1.0.0",
+  "name": "Ollama Text Provider",
+  "description": "Tier-4 Ollama provider for AI text generation via local Ollama instance",
+  "author": "PintoBean Team",
+  "assemblies": [
+    "Yokan.PintoBean.Providers.AI.Ollama.dll"
+  ],
+  "capabilities": [
+    "ai-text",
+    "llama-family",
+    "context-window-8k",
+    "cost-tier-free",
+    "local-inference",
+    "streaming",
+    "conversation",
+    "completion"
+  ],
+  "entryType": "Yokan.PintoBean.Providers.AI.Ollama.OllamaTextProvider",
+  "contractVersion": "0.1.0"
+}
