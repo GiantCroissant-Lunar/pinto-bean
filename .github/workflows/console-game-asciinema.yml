@@ -68,7 +68,7 @@ jobs:
         run: agg artifacts/console-game-dungeon.cast artifacts/console-game-dungeon.gif
 
       - name: Upload recording artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: console-game-dungeon-demo
           path: |
